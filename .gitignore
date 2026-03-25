@@ -1,0 +1,30 @@
+# Environment variables (if you create a config file later)
+.env
+.env.local
+.env.*.local
+
+# Local development files
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Build outputs (if you add a build step later)
+dist/
+build/
+node_modules/
+
+# Backup files
+*.bak
+*.swp
+*~
+
+# Never commit these (if you create them)
+config.local.js
+secrets.json
+credentials.json
