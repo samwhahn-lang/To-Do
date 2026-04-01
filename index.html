@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Todo List</title>
+    <title>Daily Task System</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -17,220 +19,193 @@
         }
 
         :root {
-            --bg-primary: #0a0e14;
-            --bg-secondary: #151922;
-            --bg-tertiary: #1f2430;
-            --text-primary: #e6e6e6;
-            --text-secondary: #8a8a8a;
-            --accent-green: #39ff14;
-            --accent-cyan: #00ffff;
-            --accent-pink: #ff006e;
-            --accent-yellow: #ffeb3b;
-            --border: #2a2f3a;
+            --noir: #0d0d0d;
+            --charcoal: #1a1a1a;
+            --slate: #2d2d2d;
+            --ash: #4a4a4a;
+            --ghost: #e8e8e8;
+            --paper: #f5f5f5;
+            --lime: #d4ff00;
+            --cyan: #00fff5;
+            --coral: #ff6b6b;
+            --gold: #ffd700;
         }
 
         body {
-            font-family: 'Space Mono', monospace;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--noir);
+            color: var(--ghost);
             line-height: 1.6;
             min-height: 100vh;
-            background-image: 
-                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(57, 255, 20, 0.03) 2px, rgba(57, 255, 20, 0.03) 4px);
+            position: relative;
+            overflow-x: hidden;
         }
 
-        .container {
-            max-width: 900px;
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(212, 255, 0, 0.02) 2px,
+                    rgba(212, 255, 0, 0.02) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 2rem;
-            animation: fadeIn 0.6s ease-out;
+            padding: 3rem 2rem;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .header {
+        .masthead {
+            margin-bottom: 4rem;
             text-align: center;
+            position: relative;
+        }
+
+        .masthead::after {
+            content: '';
+            position: absolute;
+            bottom: -1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 2px;
+            background: var(--lime);
+            box-shadow: 0 0 20px var(--lime);
+        }
+
+        .date-header {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--lime), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.4)); }
+            to { filter: drop-shadow(0 0 40px rgba(0, 255, 245, 0.6)); }
+        }
+
+        .tagline {
+            font-size: 0.875rem;
+            letter-spacing: 0.3em;
+            color: var(--ash);
+            text-transform: uppercase;
+        }
+
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 3rem;
-            padding: 2rem;
-            border: 2px solid var(--accent-green);
-            border-radius: 4px;
-            background: var(--bg-secondary);
+            padding: 1.5rem;
+            background: var(--charcoal);
+            border: 1px solid var(--slate);
+            border-radius: 2px;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: 2px solid var(--lime);
+            color: var(--lime);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
         }
 
-        .header::before {
+        .btn::before {
             content: '';
             position: absolute;
             top: 0;
             left: -100%;
             width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
-            animation: scan 3s infinite;
+            height: 100%;
+            background: var(--lime);
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: -1;
         }
 
-        @keyframes scan {
-            to {
-                left: 100%;
-            }
-        }
-
-        .date-display {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-green);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
-        }
-
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            letter-spacing: 0.2em;
-        }
-
-        .auth-container {
-            max-width: 400px;
-            margin: 4rem auto;
-            padding: 2rem;
-            background: var(--bg-secondary);
-            border: 2px solid var(--accent-cyan);
-            border-radius: 4px;
-        }
-
-        .auth-container h2 {
-            color: var(--accent-cyan);
-            margin-bottom: 1.5rem;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .input-group {
-            margin-bottom: 1rem;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        input[type="text"],
-        input[type="email"],
-        input[type="password"],
-        textarea {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-family: 'Space Mono', monospace;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
-        }
-
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        input:focus,
-        textarea:focus {
-            outline: none;
-            border-color: var(--accent-green);
-            box-shadow: 0 0 0 2px rgba(57, 255, 20, 0.1);
-        }
-
-        .btn {
-            padding: 0.75rem 2rem;
-            background: var(--accent-green);
-            color: var(--bg-primary);
-            border: none;
-            border-radius: 4px;
-            font-family: 'Space Mono', monospace;
-            font-weight: 700;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+        .btn:hover::before {
+            left: 0;
         }
 
         .btn:hover {
-            background: var(--accent-cyan);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
-            transform: translateY(-2px);
+            color: var(--noir);
+            box-shadow: 0 0 20px rgba(212, 255, 0, 0.4);
         }
 
         .btn:active {
-            transform: translateY(0);
+            transform: scale(0.98);
         }
 
         .btn-secondary {
-            background: transparent;
-            border: 1px solid var(--accent-cyan);
-            color: var(--accent-cyan);
+            border-color: var(--ash);
+            color: var(--ash);
         }
 
-        .btn-secondary:hover {
-            background: var(--accent-cyan);
-            color: var(--bg-primary);
+        .btn-secondary::before {
+            background: var(--ash);
         }
 
-        .btn-small {
-            padding: 0.5rem 1rem;
-            font-size: 0.75rem;
+        .btn-danger {
+            border-color: var(--coral);
+            color: var(--coral);
+        }
+
+        .btn-danger::before {
+            background: var(--coral);
         }
 
         .section {
-            margin-bottom: 2rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 1.5rem;
-            animation: slideIn 0.4s ease-out;
-            animation-fill-mode: both;
-            cursor: move;
+            margin-bottom: 2.5rem;
+            background: var(--charcoal);
+            border-left: 4px solid var(--lime);
+            padding: 2rem;
+            position: relative;
+            animation: slideIn 0.5s ease-out backwards;
         }
 
-        .section.dragging {
-            opacity: 0.5;
-        }
-
-        .section.drag-over {
-            border-color: var(--accent-cyan);
-            border-width: 2px;
-        }
-
-        .stories-section {
-            border: 2px solid var(--accent-yellow);
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 235, 59, 0.05) 100%);
-            cursor: default;
+        .section.stories {
+            border-left-color: var(--gold);
         }
 
         @keyframes slideIn {
             from {
                 opacity: 0;
-                transform: translateX(-20px);
+                transform: translateX(-30px);
             }
             to {
                 opacity: 1;
@@ -242,53 +217,21 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--accent-green);
-        }
-
-        .stories-section .section-header {
-            border-bottom-color: var(--accent-yellow);
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--slate);
         }
 
         .section-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--accent-green);
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            letter-spacing: 0.02em;
+            color: var(--lime);
         }
 
-        .drag-handle {
-            cursor: move;
-            color: var(--text-secondary);
-            font-size: 1.25rem;
-        }
-
-        .stories-section .section-title {
-            color: var(--accent-yellow);
-        }
-
-        .section-title-input {
-            background: transparent;
-            border: none;
-            border-bottom: 2px dashed var(--accent-cyan);
-            color: var(--accent-green);
-            font-size: 1.25rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.25rem 0.5rem;
-            font-family: 'Space Mono', monospace;
-        }
-
-        .section-title-input:focus {
-            outline: none;
-            border-bottom-color: var(--accent-green);
+        .section.stories .section-title {
+            color: var(--gold);
         }
 
         .section-actions {
@@ -297,78 +240,93 @@
         }
 
         .icon-btn {
+            width: 36px;
+            height: 36px;
             background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            padding: 0.5rem;
+            border: 1px solid var(--slate);
+            color: var(--ash);
             cursor: pointer;
-            border-radius: 4px;
-            font-size: 0.875rem;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
         }
 
         .icon-btn:hover {
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
+            border-color: var(--lime);
+            color: var(--lime);
+            background: rgba(212, 255, 0, 0.05);
         }
 
         .task-list {
             list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
 
-        .task-item {
+        .task {
             display: flex;
             align-items: flex-start;
             gap: 1rem;
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            transition: all 0.2s ease;
+            padding: 1rem;
+            background: var(--slate);
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            position: relative;
         }
 
-        .task-item:hover {
-            border-color: var(--accent-green);
-            background: rgba(57, 255, 20, 0.05);
+        .task::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--lime);
+            transform: scaleY(0);
+            transition: transform 0.2s;
         }
 
-        .task-item.completed {
-            opacity: 0.6;
+        .task:hover::before {
+            transform: scaleY(1);
         }
 
-        .task-item.completed .task-text {
+        .task:hover {
+            border-color: var(--lime);
+            background: rgba(212, 255, 0, 0.03);
+        }
+
+        .task.completed {
+            opacity: 0.5;
+        }
+
+        .task.completed .task-text {
             text-decoration: line-through;
-            color: var(--text-secondary);
-        }
-
-        .task-item.editing {
-            background: rgba(0, 255, 255, 0.1);
-            border-color: var(--accent-cyan);
-        }
-
-        .subtask-item {
-            margin-left: 2rem;
-            padding: 0.5rem 0.75rem;
-            background: rgba(0, 0, 0, 0.3);
+            color: var(--ash);
         }
 
         .checkbox {
             appearance: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--accent-green);
-            border-radius: 4px;
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--ash);
+            background: transparent;
             cursor: pointer;
             position: relative;
-            transition: all 0.2s ease;
             flex-shrink: 0;
-            margin-top: 0.25rem;
+            margin-top: 2px;
+            transition: all 0.2s;
+        }
+
+        .checkbox:hover {
+            border-color: var(--lime);
         }
 
         .checkbox:checked {
-            background: var(--accent-green);
-            box-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+            background: var(--lime);
+            border-color: var(--lime);
         }
 
         .checkbox:checked::after {
@@ -377,211 +335,238 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: var(--bg-primary);
-            font-weight: 700;
+            color: var(--noir);
+            font-weight: 600;
             font-size: 0.875rem;
         }
 
         .task-content {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            min-width: 0;
         }
 
         .task-text {
-            color: var(--text-primary);
             word-break: break-word;
+            color: var(--ghost);
+            font-size: 0.9375rem;
         }
 
-        .task-text-input {
-            background: var(--bg-primary);
-            border: 1px solid var(--accent-cyan);
-            color: var(--text-primary);
-            padding: 0.5rem;
-            border-radius: 4px;
-            font-family: 'Space Mono', monospace;
-            font-size: 0.875rem;
-        }
-
-        .task-text-input:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2);
-        }
-
-        .task-actions {
+        .task-meta {
             display: flex;
-            gap: 0.5rem;
             align-items: center;
+            gap: 0.75rem;
             flex-shrink: 0;
         }
 
-        .task-badge {
-            padding: 0.25rem 0.5rem;
-            background: var(--accent-pink);
-            color: var(--bg-primary);
-            font-size: 0.75rem;
-            font-weight: 700;
-            border-radius: 4px;
+        .badge {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            flex-shrink: 0;
+            border: 1px solid;
         }
 
-        .task-badge.one-time {
-            background: var(--accent-cyan);
+        .badge-daily {
+            color: var(--lime);
+            border-color: var(--lime);
+            background: rgba(212, 255, 0, 0.1);
+        }
+
+        .badge-onetime {
+            color: var(--cyan);
+            border-color: var(--cyan);
+            background: rgba(0, 255, 245, 0.1);
         }
 
         .add-task-form {
             display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            align-items: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
         }
 
-        .add-task-form input {
+        .task-input {
             flex: 1;
+            min-width: 250px;
+            padding: 0.875rem;
+            background: var(--slate);
+            border: 1px solid var(--ash);
+            color: var(--ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            transition: all 0.2s;
         }
 
-        .task-type-toggle {
+        .task-input:focus {
+            outline: none;
+            border-color: var(--lime);
+            background: rgba(212, 255, 0, 0.03);
+            box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
+        }
+
+        .task-input::placeholder {
+            color: var(--ash);
+        }
+
+        .type-toggle {
             display: flex;
-            gap: 0.5rem;
-            background: var(--bg-tertiary);
-            padding: 0.5rem;
-            border-radius: 4px;
+            background: var(--slate);
+            border: 1px solid var(--ash);
         }
 
-        .toggle-option {
-            padding: 0.5rem 1rem;
+        .type-option {
+            padding: 0.875rem 1.25rem;
             background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-family: 'Space Mono', monospace;
+            border: none;
+            color: var(--ash);
+            font-family: 'IBM Plex Mono', monospace;
             font-size: 0.75rem;
+            font-weight: 600;
             text-transform: uppercase;
             cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
+            border-right: 1px solid var(--ash);
         }
 
-        .toggle-option.active {
-            background: var(--accent-green);
-            color: var(--bg-primary);
-            border-color: var(--accent-green);
+        .type-option:last-child {
+            border-right: none;
         }
 
-        .toggle-option.one-time.active {
-            background: var(--accent-cyan);
-            border-color: var(--accent-cyan);
+        .type-option.active {
+            background: var(--lime);
+            color: var(--noir);
         }
 
-        .new-section-form {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            background: var(--bg-secondary);
-            border: 2px dashed var(--border);
-            border-radius: 4px;
+        .type-option:not(.active):hover {
+            background: rgba(212, 255, 0, 0.1);
+            color: var(--lime);
         }
 
-        .toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
+        .story-field {
+            margin-bottom: 1.5rem;
+        }
+
+        .story-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--gold);
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
+        .story-textarea {
+            width: 100%;
+            min-height: 100px;
             padding: 1rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            gap: 1rem;
-            flex-wrap: wrap;
+            background: var(--slate);
+            border: 1px solid var(--ash);
+            color: var(--ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            resize: vertical;
+            transition: all 0.2s;
         }
 
-        .toolbar-left {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+        .story-textarea:focus {
+            outline: none;
+            border-color: var(--gold);
+            background: rgba(255, 215, 0, 0.03);
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
         }
 
-        .error-message {
-            background: var(--accent-pink);
-            color: var(--bg-primary);
-            padding: 1rem;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            font-weight: 700;
+        .auth-screen {
+            max-width: 450px;
+            margin: 6rem auto;
+            padding: 3rem;
+            background: var(--charcoal);
+            border: 1px solid var(--slate);
         }
 
-        .loading {
+        .auth-title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 2rem;
             text-align: center;
-            padding: 4rem;
-            color: var(--accent-cyan);
-            font-size: 1.25rem;
-        }
-
-        .archive-container {
             margin-bottom: 2rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 1.5rem;
+            color: var(--lime);
+            text-transform: uppercase;
         }
 
-        .archive-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--accent-cyan);
+        .input-group {
+            margin-bottom: 1.5rem;
         }
 
-        .archive-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
+        .input-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            color: var(--ash);
         }
 
-        .date-selector {
+        .input-field {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--slate);
+            border: 1px solid var(--ash);
+            color: var(--ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--lime);
+            box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
+        }
+
+        .archive {
+            margin-bottom: 2.5rem;
+            background: var(--charcoal);
+            border-left: 4px solid var(--cyan);
+            padding: 2rem;
+        }
+
+        .archive-dates {
             display: flex;
             gap: 0.5rem;
+            margin-bottom: 1.5rem;
             flex-wrap: wrap;
         }
 
         .date-btn {
             padding: 0.5rem 1rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-family: 'Space Mono', monospace;
+            background: var(--slate);
+            border: 1px solid var(--ash);
+            color: var(--ash);
+            font-family: 'IBM Plex Mono', monospace;
             font-size: 0.75rem;
             cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
 
         .date-btn:hover {
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
+            border-color: var(--cyan);
+            color: var(--cyan);
         }
 
         .date-btn.active {
-            background: var(--accent-cyan);
-            color: var(--bg-primary);
-            border-color: var(--accent-cyan);
+            background: var(--cyan);
+            color: var(--noir);
+            border-color: var(--cyan);
         }
 
-        .archive-day {
-            margin-bottom: 2rem;
-        }
-
-        .archive-day-header {
-            color: var(--accent-cyan);
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+        .archive-day-title {
+            color: var(--cyan);
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
         }
 
         .archive-section {
@@ -589,70 +574,73 @@
         }
 
         .archive-section-title {
-            color: var(--accent-green);
+            color: var(--lime);
+            font-weight: 600;
             font-size: 0.875rem;
             text-transform: uppercase;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
         }
 
-        .story-question {
+        .message {
+            padding: 1rem 1.5rem;
             margin-bottom: 1.5rem;
-        }
-
-        .story-question-label {
-            display: block;
-            color: var(--accent-yellow);
             font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-            line-height: 1.4;
+            font-weight: 600;
+            border-left: 4px solid;
         }
 
-        .subtask-input-container {
-            margin-left: 2rem;
-            margin-top: 0.5rem;
+        .message-error {
+            background: rgba(255, 107, 107, 0.1);
+            border-color: var(--coral);
+            color: var(--coral);
         }
 
-        .subtask-hint {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-left: 2rem;
-            margin-top: 0.25rem;
+        .message-success {
+            background: rgba(212, 255, 0, 0.1);
+            border-color: var(--lime);
+            color: var(--lime);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 6rem 2rem;
+            font-size: 1.25rem;
+            color: var(--cyan);
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
+            .app-container {
+                padding: 2rem 1rem;
             }
 
-            .date-display {
-                font-size: 1.5rem;
+            .date-header {
+                font-size: 2rem;
             }
 
-            .section-header {
-                flex-direction: column;
-                gap: 0.5rem;
-                align-items: flex-start;
-            }
-
-            .add-task-form {
-                flex-direction: column;
-            }
-
-            .toolbar {
+            .control-panel {
                 flex-direction: column;
                 align-items: stretch;
             }
 
-            .toolbar-left {
+            .control-group {
                 width: 100%;
             }
 
-            .date-selector {
-                width: 100%;
-            }
-
-            .date-btn {
+            .btn {
                 flex: 1;
+            }
+
+            .task {
+                flex-wrap: wrap;
+            }
+
+            .task-meta {
+                width: 100%;
+                justify-content: space-between;
+                margin-top: 0.5rem;
             }
         }
     </style>
@@ -661,29 +649,19 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
         
-        // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
+        // CONFIGURATION - Replace with your Supabase credentials
         const SUPABASE_URL = 'https://kjhlokwfiffsllafyvnj.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqaGxva3dmaWZmc2xsYWZ5dm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjUzMTUsImV4cCI6MjA5MDA0MTMxNX0.-mflvRFi9yOP7aoFJPHfrFTc-vY8xee1u5dnQbVI2ME';
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Get current date in EST timezone
-        function getCurrentDateEST() {
+        function getCurrentDate() {
             const now = new Date();
             const estDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
             return estDate.toISOString().split('T')[0];
-        }
-
-        // Track if we've already initialized today (prevents multiple runs)
-        function hasInitializedToday(date) {
-            const lastInit = localStorage.getItem('lastInitDate');
-            return lastInit === date;
-        }
-
-        function markInitialized(date) {
-            localStorage.setItem('lastInitDate', date);
         }
 
         function App() {
@@ -691,7 +669,8 @@
             const [loading, setLoading] = useState(true);
             const [sections, setSections] = useState([]);
             const [error, setError] = useState(null);
-            const [currentDate, setCurrentDate] = useState(getCurrentDateEST());
+            const [success, setSuccess] = useState(null);
+            const [showArchive, setShowArchive] = useState(false);
 
             useEffect(() => {
                 checkUser();
@@ -699,153 +678,122 @@
                 const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                     setUser(session?.user || null);
                     if (session?.user) {
-                        loadSections();
+                        loadData();
                     }
                 });
 
-                // Check for new day every minute
-                const dateCheckInterval = setInterval(() => {
-                    const newDate = getCurrentDateEST();
-                    if (newDate !== currentDate) {
-                        setCurrentDate(newDate);
-                        // Clear the initialization flag for the new day
-                        localStorage.removeItem('lastInitDate');
-                        if (user) {
-                            handleNewDay(newDate);
-                        }
-                    }
-                }, 60000);
-
                 return () => {
                     authListener?.subscription?.unsubscribe();
-                    clearInterval(dateCheckInterval);
                 };
-            }, [currentDate, user]);
+            }, []);
 
             async function checkUser() {
-                const { data: { session } } = await supabase.auth.getSession();
-                setUser(session?.user || null);
-                if (session?.user) {
-                    await handleNewDay(currentDate);
-                    await loadSections();
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    setUser(session?.user || null);
+                    
+                    if (session?.user) {
+                        await loadData();
+                    }
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
 
-            async function handleNewDay(date) {
-                // CRITICAL: Check if we've already initialized today
-                if (hasInitializedToday(date)) {
-                    console.log('Already initialized for', date);
-                    return;
-                }
-
-                const user = (await supabase.auth.getUser()).data.user;
-                if (!user) return;
-
+            async function loadData() {
                 try {
-                    // Step 1: Check if we already have tasks for this date
-                    const { data: existingTasks, error: checkError } = await supabase
+                    const today = getCurrentDate();
+                    const user = (await supabase.auth.getUser()).data.user;
+                    
+                    // Ensure tasks exist for today
+                    await ensureTasksForToday();
+                    
+                    // Load sections
+                    const { data: sectionsData, error: sectionsError } = await supabase
+                        .from('sections')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .order('order_index', { ascending: true });
+
+                    if (sectionsError) throw sectionsError;
+
+                    // Load tasks for today
+                    const { data: tasksData, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .eq('date', today)
+                        .order('created_at', { ascending: true });
+
+                    if (tasksError) throw tasksError;
+
+                    setSections((sectionsData || []).map(section => ({
+                        ...section,
+                        tasks: (tasksData || []).filter(t => t.section_id === section.id)
+                    })));
+
+                } catch (err) {
+                    setError(`Failed to load data: ${err.message}`);
+                }
+            }
+
+            async function ensureTasksForToday() {
+                try {
+                    const today = getCurrentDate();
+                    const user = (await supabase.auth.getUser()).data.user;
+                    
+                    // Check if tasks already exist for today
+                    const { data: existingTasks } = await supabase
                         .from('tasks')
                         .select('id')
                         .eq('user_id', user.id)
-                        .eq('date', date)
+                        .eq('date', today)
                         .limit(1);
 
-                    if (checkError) {
-                        console.error('Error checking existing tasks:', checkError);
-                        return;
-                    }
-
+                    // If tasks exist, we're done
                     if (existingTasks && existingTasks.length > 0) {
-                        console.log('Tasks already exist for', date);
-                        markInitialized(date);
                         return;
                     }
 
-                    // Step 2: Get template tasks
-                    const { data: templateTasks, error: templateError } = await supabase
+                    // Get all templates (these are ONLY daily tasks)
+                    const { data: templates } = await supabase
                         .from('task_templates')
                         .select('*')
                         .eq('user_id', user.id);
 
-                    if (templateError) {
-                        console.error('Error fetching templates:', templateError);
+                    // No templates means this is first use or all tasks were deleted
+                    if (!templates || templates.length === 0) {
                         return;
                     }
 
-                    if (!templateTasks || templateTasks.length === 0) {
-                        console.log('No templates found');
-                        markInitialized(date);
-                        return;
-                    }
-
-                    // Step 3: Create today's tasks from templates
-                    const tasksToCreate = templateTasks.map(template => ({
-                        section_id: template.section_id,
+                    // Create today's tasks from templates
+                    const tasksToCreate = templates.map(template => ({
                         user_id: user.id,
+                        section_id: template.section_id,
                         text: template.text,
                         completed: false,
-                        date: date,
-                        template_id: template.id,
-                        parent_task_id: template.parent_task_id
+                        date: today,
+                        template_id: template.id
                     }));
 
-                    const { error: insertError } = await supabase
+                    const { error } = await supabase
                         .from('tasks')
                         .insert(tasksToCreate);
 
-                    if (insertError) {
-                        // If we get a unique constraint violation, that's actually fine - it means
-                        // another process already created the tasks
-                        if (insertError.code === '23505') {
-                            console.log('Tasks already created by another process');
-                        } else {
-                            console.error('Error creating tasks:', insertError);
-                        }
-                    } else {
-                        console.log(`Created ${tasksToCreate.length} tasks for ${date}`);
+                    // Error 23505 = unique constraint violation (tasks already exist, that's fine)
+                    if (error && error.code !== '23505') {
+                        throw error;
                     }
 
-                    // Mark as initialized regardless of success/failure to prevent loops
-                    markInitialized(date);
-
                 } catch (err) {
-                    console.error('Unexpected error in handleNewDay:', err);
-                    markInitialized(date); // Mark as initialized to prevent infinite loops
+                    console.error('Error ensuring tasks:', err);
                 }
-            }
-
-            async function loadSections() {
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-                
-                const { data, error } = await supabase
-                    .from('sections')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('order_index', { ascending: true });
-
-                if (error) {
-                    setError(error.message);
-                    return;
-                }
-
-                // Load tasks for today only
-                const { data: tasksData } = await supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('date', today)
-                    .order('created_at', { ascending: true });
-
-                setSections(data.map(section => ({
-                    ...section,
-                    tasks: tasksData?.filter(t => t.section_id === section.id) || []
-                })));
             }
 
             if (loading) {
-                return <div className="loading">⚡ INITIALIZING SYSTEM...</div>;
+                return <div className="loading">Loading System...</div>;
             }
 
             if (!user) {
@@ -853,13 +801,16 @@
             }
 
             return (
-                <TodoApp 
-                    sections={sections} 
+                <MainApp 
+                    sections={sections}
                     setSections={setSections}
-                    loadSections={loadSections}
+                    loadData={loadData}
                     error={error}
                     setError={setError}
-                    currentDate={currentDate}
+                    success={success}
+                    setSuccess={setSuccess}
+                    showArchive={showArchive}
+                    setShowArchive={setShowArchive}
                 />
             );
         }
@@ -876,16 +827,10 @@
 
                 try {
                     if (isLogin) {
-                        const { error } = await supabase.auth.signInWithPassword({
-                            email,
-                            password
-                        });
+                        const { error } = await supabase.auth.signInWithPassword({ email, password });
                         if (error) throw error;
                     } else {
-                        const { error } = await supabase.auth.signUp({
-                            email,
-                            password
-                        });
+                        const { error } = await supabase.auth.signUp({ email, password });
                         if (error) throw error;
                         alert('Check your email to confirm your account!');
                     }
@@ -895,51 +840,51 @@
             }
 
             return (
-                <div className="auth-container">
-                    <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
-                    {error && <div className="error-message">{error}</div>}
+                <div className="auth-screen">
+                    <h1 className="auth-title">{isLogin ? 'Login' : 'Sign Up'}</h1>
+                    {error && <div className="message message-error">{error}</div>}
                     <form onSubmit={handleAuth}>
                         <div className="input-group">
-                            <label>Email</label>
+                            <label className="input-label">Email</label>
                             <input
                                 type="email"
+                                className="input-field"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                             />
                         </div>
                         <div className="input-group">
-                            <label>Password</label>
+                            <label className="input-label">Password</label>
                             <input
                                 type="password"
+                                className="input-field"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>
-                        <button type="submit" className="btn" style={{width: '100%', marginTop: '1rem'}}>
+                        <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}}>
                             {isLogin ? 'Login' : 'Sign Up'}
                         </button>
                         <button
                             type="button"
                             className="btn btn-secondary"
-                            style={{width: '100%', marginTop: '0.5rem'}}
+                            style={{width: '100%'}}
                             onClick={() => setIsLogin(!isLogin)}
                         >
-                            {isLogin ? 'Need an account?' : 'Already have an account?'}
+                            {isLogin ? 'Need an account?' : 'Have an account?'}
                         </button>
                     </form>
                 </div>
             );
         }
 
-        function TodoApp({ sections, setSections, loadSections, error, setError, currentDate }) {
+        function MainApp({ sections, setSections, loadData, error, setError, success, setSuccess, showArchive, setShowArchive }) {
             const [showNewSection, setShowNewSection] = useState(false);
             const [newSectionName, setNewSectionName] = useState('');
-            const [showArchive, setShowArchive] = useState(false);
-            const [draggedSection, setDraggedSection] = useState(null);
 
-            const today = new Date(currentDate + 'T12:00:00').toLocaleDateString('en-US', {
+            const today = new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -947,192 +892,133 @@
                 timeZone: 'America/New_York'
             });
 
-            async function handleSignOut() {
-                await supabase.auth.signOut();
-            }
-
             async function addSection(e) {
                 e.preventDefault();
                 if (!newSectionName.trim()) return;
 
-                const user = (await supabase.auth.getUser()).data.user;
-                const { data, error } = await supabase
-                    .from('sections')
-                    .insert([{
-                        user_id: user.id,
-                        name: newSectionName,
-                        order_index: sections.length
-                    }])
-                    .select();
+                try {
+                    const user = (await supabase.auth.getUser()).data.user;
+                    const { data, error } = await supabase
+                        .from('sections')
+                        .insert([{
+                            user_id: user.id,
+                            name: newSectionName,
+                            order_index: sections.length
+                        }])
+                        .select();
 
-                if (error) {
-                    setError(error.message);
-                    return;
+                    if (error) throw error;
+
+                    setSections([...sections, { ...data[0], tasks: [] }]);
+                    setNewSectionName('');
+                    setShowNewSection(false);
+                    setSuccess('Section created!');
+                    setTimeout(() => setSuccess(null), 3000);
+                } catch (err) {
+                    setError(err.message);
                 }
-
-                setSections([...sections, { ...data[0], tasks: [] }]);
-                setNewSectionName('');
-                setShowNewSection(false);
             }
 
             async function deleteSection(sectionId) {
                 if (!confirm('Delete this section and all its tasks?')) return;
 
-                const { error } = await supabase
-                    .from('sections')
-                    .delete()
-                    .eq('id', sectionId);
-
-                if (error) {
-                    setError(error.message);
-                    return;
-                }
-
-                setSections(sections.filter(s => s.id !== sectionId));
-            }
-
-            async function updateSectionName(sectionId, newName) {
-                const { error } = await supabase
-                    .from('sections')
-                    .update({ name: newName })
-                    .eq('id', sectionId);
-
-                if (error) {
-                    setError(error.message);
-                    return;
-                }
-
-                setSections(sections.map(s => 
-                    s.id === sectionId ? { ...s, name: newName } : s
-                ));
-            }
-
-            async function reorderSections(newOrder) {
-                setSections(newOrder);
-
-                const updates = newOrder.map((section, index) => ({
-                    id: section.id,
-                    order_index: index
-                }));
-
-                for (const update of updates) {
-                    await supabase
+                try {
+                    const { error } = await supabase
                         .from('sections')
-                        .update({ order_index: update.order_index })
-                        .eq('id', update.id);
+                        .delete()
+                        .eq('id', sectionId);
+
+                    if (error) throw error;
+
+                    setSections(sections.filter(s => s.id !== sectionId));
+                    setSuccess('Section deleted!');
+                    setTimeout(() => setSuccess(null), 3000);
+                } catch (err) {
+                    setError(err.message);
                 }
-            }
-
-            function handleDragStart(e, index) {
-                setDraggedSection(index);
-                e.dataTransfer.effectAllowed = 'move';
-            }
-
-            function handleDragOver(e, index) {
-                e.preventDefault();
-                if (draggedSection === null || draggedSection === index) return;
-                
-                const newSections = [...sections];
-                const draggedItem = newSections[draggedSection];
-                newSections.splice(draggedSection, 1);
-                newSections.splice(index, 0, draggedItem);
-                
-                setDraggedSection(index);
-                setSections(newSections);
-            }
-
-            function handleDragEnd() {
-                if (draggedSection !== null) {
-                    reorderSections(sections);
-                }
-                setDraggedSection(null);
             }
 
             return (
-                <div className="container">
-                    <div className="header">
-                        <div className="date-display">{today}</div>
-                        <div className="subtitle">Daily Task Protocol</div>
-                    </div>
+                <div className="app-container">
+                    <header className="masthead">
+                        <h1 className="date-header">{today}</h1>
+                        <p className="tagline">Task Protocol</p>
+                    </header>
 
-                    <div className="toolbar">
-                        <div className="toolbar-left">
+                    <div className="control-panel">
+                        <div className="control-group">
                             <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>
                                 + New Section
                             </button>
                             <button 
-                                className={`btn ${showArchive ? '' : 'btn-secondary'}`}
+                                className={showArchive ? "btn" : "btn btn-secondary"}
                                 onClick={() => setShowArchive(!showArchive)}
                             >
                                 {showArchive ? 'Hide Archive' : 'View Archive'}
                             </button>
                         </div>
-                        <button className="btn btn-secondary" onClick={handleSignOut}>
+                        <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
                             Sign Out
                         </button>
                     </div>
 
-                    {error && <div className="error-message">{error}</div>}
+                    {error && <div className="message message-error">❌ {error}</div>}
+                    {success && <div className="message message-success">✓ {success}</div>}
+
+                    {showNewSection && (
+                        <div className="section" style={{marginBottom: '2.5rem'}}>
+                            <form onSubmit={addSection}>
+                                <div className="input-group">
+                                    <label className="input-label">Section Name</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        value={newSectionName}
+                                        onChange={(e) => setNewSectionName(e.target.value)}
+                                        placeholder="e.g., Work, Personal, Health"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div style={{display: 'flex', gap: '0.75rem', marginTop: '1rem'}}>
+                                    <button type="submit" className="btn">Create</button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowNewSection(false)}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
 
                     {showArchive && <Archive />}
 
-                    {showNewSection && (
-                        <form className="new-section-form" onSubmit={addSection}>
-                            <div className="input-group">
-                                <label>Section Name</label>
-                                <input
-                                    type="text"
-                                    value={newSectionName}
-                                    onChange={(e) => setNewSectionName(e.target.value)}
-                                    placeholder="e.g., Work, Personal, Health"
-                                    autoFocus
-                                />
-                            </div>
-                            <div style={{display: 'flex', gap: '0.5rem', marginTop: '1rem'}}>
-                                <button type="submit" className="btn">Create</button>
-                                <button 
-                                    type="button" 
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowNewSection(false)}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
                     {sections.filter(s => s.name !== 'Stories').map((section, index) => (
-                        <div
-                            key={section.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, index)}
-                            onDragOver={(e) => handleDragOver(e, index)}
-                            onDragEnd={handleDragEnd}
-                            className={draggedSection === index ? 'section dragging' : 'section'}
+                        <div 
+                            key={section.id} 
+                            className="section"
                             style={{animationDelay: `${index * 0.1}s`}}
                         >
                             <Section
                                 section={section}
+                                loadData={loadData}
                                 deleteSection={deleteSection}
-                                updateSectionName={updateSectionName}
-                                loadSections={loadSections}
+                                setError={setError}
                             />
                         </div>
                     ))}
 
-                    <StoriesSection />
+                    <StoriesSection setError={setError} setSuccess={setSuccess} />
                 </div>
             );
         }
 
-        function Section({ section, deleteSection, updateSectionName, loadSections }) {
+        function Section({ section, loadData, deleteSection, setError }) {
             const [tasks, setTasks] = useState(section.tasks || []);
             const [newTaskText, setNewTaskText] = useState('');
             const [taskType, setTaskType] = useState('daily');
-            const [isEditingName, setIsEditingName] = useState(false);
-            const [editedName, setEditedName] = useState(section.name);
-            const [editingTaskId, setEditingTaskId] = useState(null);
-            const [editedTaskText, setEditedTaskText] = useState('');
 
             useEffect(() => {
                 setTasks(section.tasks || []);
@@ -1142,248 +1028,76 @@
                 e.preventDefault();
                 if (!newTaskText.trim()) return;
 
-                const today = getCurrentDateEST();
+                const today = getCurrentDate();
                 const user = (await supabase.auth.getUser()).data.user;
 
                 try {
-                    // If it's a daily task, create both template and today's instance
                     if (taskType === 'daily') {
-                        // Create template
+                        // DAILY TASK: Create template + today's instance
                         const { data: templateData, error: templateError } = await supabase
                             .from('task_templates')
                             .insert([{
-                                section_id: section.id,
                                 user_id: user.id,
-                                text: newTaskText,
-                                parent_task_id: null
+                                section_id: section.id,
+                                text: newTaskText
                             }])
                             .select();
 
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
+                        if (templateError) throw templateError;
 
-                        // Create today's instance
-                        const { data, error } = await supabase
+                        // Create today's task
+                        const { data: taskData, error: taskError } = await supabase
                             .from('tasks')
                             .insert([{
-                                section_id: section.id,
                                 user_id: user.id,
+                                section_id: section.id,
                                 text: newTaskText,
                                 completed: false,
                                 date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: null
+                                template_id: templateData[0].id
                             }])
                             .select();
 
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
+                        if (taskError) throw taskError;
+                        
+                        setTasks([...tasks, taskData[0]]);
                     } else {
-                        // One-time task - no template needed
-                        const { data, error } = await supabase
+                        // ONE-TIME TASK: No template, just today's task
+                        const { data: taskData, error: taskError } = await supabase
                             .from('tasks')
                             .insert([{
-                                section_id: section.id,
                                 user_id: user.id,
+                                section_id: section.id,
                                 text: newTaskText,
                                 completed: false,
                                 date: today,
-                                template_id: null,
-                                parent_task_id: null
+                                template_id: null
                             }])
                             .select();
 
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
+                        if (taskError) throw taskError;
+                        
+                        setTasks([...tasks, taskData[0]]);
                     }
 
                     setNewTaskText('');
                 } catch (err) {
-                    console.error('Error adding task:', err);
-                    alert('Error adding task');
-                }
-            }
-
-            async function addSubtask(parentTaskId, subtaskText) {
-                if (!subtaskText.trim()) return;
-
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-                const parentTask = tasks.find(t => t.id === parentTaskId);
-
-                try {
-                    // If parent has a template, this is a daily subtask
-                    if (parentTask?.template_id) {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                parent_task_id: parentTask.template_id
-                            }])
-                            .select();
-
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    } else {
-                        // One-time subtask
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    }
-                } catch (err) {
-                    console.error('Error adding subtask:', err);
-                    alert('Error adding subtask');
+                    setError(err.message);
                 }
             }
 
             async function toggleTask(taskId, completed) {
-                const { error } = await supabase
-                    .from('tasks')
-                    .update({ completed })
-                    .eq('id', taskId);
-
-                if (error) {
-                    alert(error.message);
-                    return;
-                }
-
-                setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
-            }
-
-            async function toggleTaskType(taskId, currentHasTemplate) {
-                const task = tasks.find(t => t.id === taskId);
-                if (!task) return;
-
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-
                 try {
-                    if (currentHasTemplate) {
-                        // Convert from daily to one-time: delete template
-                        if (task.template_id) {
-                            await supabase
-                                .from('task_templates')
-                                .delete()
-                                .eq('id', task.template_id);
-
-                            await supabase
-                                .from('tasks')
-                                .update({ template_id: null })
-                                .eq('id', taskId);
-
-                            setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: null } : t));
-                        }
-                    } else {
-                        // Convert from one-time to daily: create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: task.text,
-                                parent_task_id: task.parent_task_id ? tasks.find(t => t.id === task.parent_task_id)?.template_id : null
-                            }])
-                            .select();
-
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        await supabase
-                            .from('tasks')
-                            .update({ template_id: templateData[0].id })
-                            .eq('id', taskId);
-
-                        setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: templateData[0].id } : t));
-                    }
-                } catch (err) {
-                    console.error('Error toggling task type:', err);
-                    alert('Error toggling task type');
-                }
-            }
-
-            async function updateTaskText(taskId, newText) {
-                if (!newText.trim()) {
-                    setEditingTaskId(null);
-                    return;
-                }
-
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    // Update the task
                     const { error } = await supabase
                         .from('tasks')
-                        .update({ text: newText })
+                        .update({ completed })
                         .eq('id', taskId);
 
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
+                    if (error) throw error;
 
-                    // If it has a template, update the template too
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .update({ text: newText })
-                            .eq('id', task.template_id);
-                    }
-
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, text: newText } : t));
-                    setEditingTaskId(null);
+                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
                 } catch (err) {
-                    console.error('Error updating task:', err);
-                    alert('Error updating task');
+                    setError(err.message);
                 }
             }
 
@@ -1391,147 +1105,91 @@
                 const task = tasks.find(t => t.id === taskId);
                 
                 try {
-                    // Delete the task and its subtasks
+                    // Delete the task
                     const { error } = await supabase
                         .from('tasks')
                         .delete()
-                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+                        .eq('id', taskId);
 
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
+                    if (error) throw error;
 
-                    // If it has a template, delete the template too (and all subtask templates)
+                    // If it's a DAILY task, delete the template too
+                    // This prevents it from regenerating tomorrow
                     if (task?.template_id) {
                         await supabase
                             .from('task_templates')
                             .delete()
-                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
+                            .eq('id', task.template_id);
                     }
 
-                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
+                    setTasks(tasks.filter(t => t.id !== taskId));
                 } catch (err) {
-                    console.error('Error deleting task:', err);
-                    alert('Error deleting task');
+                    setError(err.message);
                 }
             }
-
-            async function saveNameEdit() {
-                if (editedName.trim() && editedName !== section.name) {
-                    await updateSectionName(section.id, editedName);
-                }
-                setIsEditingName(false);
-            }
-
-            function startEditingTask(task) {
-                setEditingTaskId(task.id);
-                setEditedTaskText(task.text);
-            }
-
-            const parentTasks = tasks.filter(t => !t.parent_task_id);
-            const getSubtasks = (parentId) => tasks.filter(t => t.parent_task_id === parentId);
 
             return (
                 <>
                     <div className="section-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                            <span className="drag-handle" title="Drag to reorder">⋮⋮</span>
-                            {isEditingName ? (
-                                <input
-                                    type="text"
-                                    className="section-title-input"
-                                    value={editedName}
-                                    onChange={(e) => setEditedName(e.target.value)}
-                                    onBlur={saveNameEdit}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter') {
-                                            saveNameEdit();
-                                        }
-                                    }}
-                                    autoFocus
-                                />
-                            ) : (
-                                <h2 
-                                    className="section-title"
-                                    onClick={() => setIsEditingName(true)}
-                                    style={{ cursor: 'pointer' }}
-                                    title="Click to edit name"
-                                >
-                                    {section.name}
-                                </h2>
-                            )}
-                        </div>
+                        <h2 className="section-title">{section.name}</h2>
                         <div className="section-actions">
-                            <button 
-                                className="icon-btn"
-                                onClick={() => setIsEditingName(!isEditingName)}
-                                title="Edit name"
-                            >
-                                ✏️
-                            </button>
                             <button 
                                 className="icon-btn"
                                 onClick={() => deleteSection(section.id)}
                                 title="Delete section"
                             >
-                                🗑️
+                                ✕
                             </button>
                         </div>
                     </div>
 
                     <ul className="task-list">
-                        {parentTasks.map(task => (
-                            <React.Fragment key={task.id}>
-                                <TaskItem
-                                    task={task}
-                                    editingTaskId={editingTaskId}
-                                    editedTaskText={editedTaskText}
-                                    setEditedTaskText={setEditedTaskText}
-                                    toggleTask={toggleTask}
-                                    toggleTaskType={toggleTaskType}
-                                    startEditingTask={startEditingTask}
-                                    updateTaskText={updateTaskText}
-                                    deleteTask={deleteTask}
-                                    addSubtask={addSubtask}
+                        {tasks.map(task => (
+                            <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    className="checkbox"
+                                    checked={task.completed}
+                                    onChange={(e) => toggleTask(task.id, e.target.checked)}
                                 />
-                                {getSubtasks(task.id).map(subtask => (
-                                    <TaskItem
-                                        key={subtask.id}
-                                        task={subtask}
-                                        isSubtask={true}
-                                        editingTaskId={editingTaskId}
-                                        editedTaskText={editedTaskText}
-                                        setEditedTaskText={setEditedTaskText}
-                                        toggleTask={toggleTask}
-                                        toggleTaskType={toggleTaskType}
-                                        startEditingTask={startEditingTask}
-                                        updateTaskText={updateTaskText}
-                                        deleteTask={deleteTask}
-                                    />
-                                ))}
-                            </React.Fragment>
+                                <div className="task-content">
+                                    <span className="task-text">{task.text}</span>
+                                </div>
+                                <div className="task-meta">
+                                    <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
+                                        {task.template_id ? 'Daily' : 'One-Time'}
+                                    </span>
+                                    <button 
+                                        className="icon-btn"
+                                        onClick={() => deleteTask(task.id)}
+                                        title="Delete task"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </li>
                         ))}
                     </ul>
 
                     <form className="add-task-form" onSubmit={addTask}>
                         <input
                             type="text"
+                            className="task-input"
                             value={newTaskText}
                             onChange={(e) => setNewTaskText(e.target.value)}
                             placeholder="Add new task..."
                         />
-                        <div className="task-type-toggle">
+                        <div className="type-toggle">
                             <button
                                 type="button"
-                                className={`toggle-option ${taskType === 'daily' ? 'active' : ''}`}
+                                className={`type-option ${taskType === 'daily' ? 'active' : ''}`}
                                 onClick={() => setTaskType('daily')}
                             >
                                 Daily
                             </button>
                             <button
                                 type="button"
-                                className={`toggle-option one-time ${taskType === 'one-time' ? 'active' : ''}`}
+                                className={`type-option ${taskType === 'one-time' ? 'active' : ''}`}
                                 onClick={() => setTaskType('one-time')}
                             >
                                 One-Time
@@ -1543,315 +1201,203 @@
             );
         }
 
-        function TaskItem({ 
-            task, 
-            isSubtask = false, 
-            editingTaskId, 
-            editedTaskText, 
-            setEditedTaskText,
-            toggleTask, 
-            toggleTaskType, 
-            startEditingTask, 
-            updateTaskText, 
-            deleteTask,
-            addSubtask 
-        }) {
-            const [showSubtaskInput, setShowSubtaskInput] = useState(false);
-            const [subtaskText, setSubtaskText] = useState('');
-            const inputRef = useRef(null);
-
-            function handleKeyDown(e) {
-                if (e.key === 'Tab' && !isSubtask) {
-                    e.preventDefault();
-                    setShowSubtaskInput(true);
-                    setTimeout(() => inputRef.current?.focus(), 0);
-                }
-                if (e.key === 'Enter' && editingTaskId === task.id) {
-                    updateTaskText(task.id, editedTaskText);
-                }
-            }
-
-            function handleSubtaskKeyDown(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (subtaskText.trim()) {
-                        addSubtask(task.id, subtaskText);
-                        setSubtaskText('');
-                    }
-                }
-                if (e.key === 'Escape') {
-                    setShowSubtaskInput(false);
-                    setSubtaskText('');
-                }
-            }
-
-            const isDaily = task.template_id !== null;
-
-            return (
-                <>
-                    <li className={`task-item ${task.completed ? 'completed' : ''} ${isSubtask ? 'subtask-item' : ''} ${editingTaskId === task.id ? 'editing' : ''}`}>
-                        <input
-                            type="checkbox"
-                            className="checkbox"
-                            checked={task.completed}
-                            onChange={(e) => toggleTask(task.id, e.target.checked)}
-                        />
-                        <div className="task-content">
-                            {editingTaskId === task.id ? (
-                                <input
-                                    type="text"
-                                    className="task-text-input"
-                                    value={editedTaskText}
-                                    onChange={(e) => setEditedTaskText(e.target.value)}
-                                    onBlur={() => updateTaskText(task.id, editedTaskText)}
-                                    onKeyDown={handleKeyDown}
-                                    autoFocus
-                                />
-                            ) : (
-                                <span 
-                                    className="task-text"
-                                    onClick={() => startEditingTask(task)}
-                                    onKeyDown={handleKeyDown}
-                                    tabIndex={0}
-                                    style={{ cursor: 'text' }}
-                                    title="Click to edit or press Tab to add subtask"
-                                >
-                                    {task.text}
-                                </span>
-                            )}
-                        </div>
-                        <div className="task-actions">
-                            <span 
-                                className={`task-badge ${isDaily ? '' : 'one-time'}`}
-                                onClick={() => toggleTaskType(task.id, isDaily)}
-                                style={{ cursor: 'pointer' }}
-                                title="Click to toggle"
-                            >
-                                {isDaily ? 'DAILY' : 'ONE-TIME'}
-                            </span>
-                            <button 
-                                className="icon-btn"
-                                onClick={() => deleteTask(task.id)}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    </li>
-                    {showSubtaskInput && !isSubtask && (
-                        <div className="subtask-input-container">
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={subtaskText}
-                                onChange={(e) => setSubtaskText(e.target.value)}
-                                onKeyDown={handleSubtaskKeyDown}
-                                onBlur={() => {
-                                    if (subtaskText.trim()) {
-                                        addSubtask(task.id, subtaskText);
-                                    }
-                                    setShowSubtaskInput(false);
-                                    setSubtaskText('');
-                                }}
-                                placeholder="Add subtask... (press Enter)"
-                                style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    background: 'var(--bg-primary)',
-                                    border: '1px solid var(--accent-green)',
-                                    borderRadius: '4px',
-                                    color: 'var(--text-primary)',
-                                    fontFamily: 'Space Mono, monospace',
-                                    fontSize: '0.875rem'
-                                }}
-                            />
-                        </div>
-                    )}
-                </>
-            );
-        }
-
-        function StoriesSection() {
+        function StoriesSection({ setError, setSuccess }) {
             const [stories, setStories] = useState({
                 different: '',
                 tension: '',
                 detail: ''
             });
-            const [isSaving, setIsSaving] = useState(false);
 
             useEffect(() => {
                 loadStories();
             }, []);
 
             async function loadStories() {
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
+                try {
+                    const today = getCurrentDate();
+                    const user = (await supabase.auth.getUser()).data.user;
 
-                const { data, error } = await supabase
-                    .from('stories')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('date', today)
-                    .single();
+                    const { data, error } = await supabase
+                        .from('stories')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .eq('date', today)
+                        .single();
 
-                if (data) {
-                    setStories({
-                        different: data.different || '',
-                        tension: data.tension || '',
-                        detail: data.detail || ''
-                    });
+                    if (error && error.code !== 'PGRST116') {
+                        throw error;
+                    }
+
+                    if (data) {
+                        setStories({
+                            different: data.different || '',
+                            tension: data.tension || '',
+                            detail: data.detail || ''
+                        });
+                    }
+                } catch (err) {
+                    console.error('Error loading stories:', err);
                 }
             }
 
             async function saveStories() {
-                setIsSaving(true);
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
+                try {
+                    const today = getCurrentDate();
+                    const user = (await supabase.auth.getUser()).data.user;
 
-                const { error } = await supabase
-                    .from('stories')
-                    .upsert({
-                        user_id: user.id,
-                        date: today,
-                        different: stories.different,
-                        tension: stories.tension,
-                        detail: stories.detail
-                    }, {
-                        onConflict: 'user_id,date'
-                    });
+                    const { error } = await supabase
+                        .from('stories')
+                        .upsert({
+                            user_id: user.id,
+                            date: today,
+                            different: stories.different,
+                            tension: stories.tension,
+                            detail: stories.detail
+                        }, {
+                            onConflict: 'user_id,date'
+                        });
 
-                if (error) {
-                    alert(error.message);
-                } else {
-                    alert('Stories saved!');
+                    if (error) throw error;
+
+                    setSuccess('Stories saved!');
+                    setTimeout(() => setSuccess(null), 3000);
+                } catch (err) {
+                    setError(err.message);
                 }
-                setIsSaving(false);
             }
 
             return (
-                <div className="section stories-section">
+                <div className="section stories">
                     <div className="section-header">
                         <h2 className="section-title">📖 Stories</h2>
                     </div>
 
-                    <div className="story-question">
-                        <label className="story-question-label">
+                    <div className="story-field">
+                        <label className="story-label">
                             What was different, unexpected, or slightly off today?
                         </label>
                         <textarea
+                            className="story-textarea"
                             value={stories.different}
                             onChange={(e) => setStories({ ...stories, different: e.target.value })}
-                            placeholder="Write your thoughts here..."
+                            placeholder="Write your thoughts..."
                         />
                     </div>
 
-                    <div className="story-question">
-                        <label className="story-question-label">
-                            What moment made me feel something or had tension (awkward, funny, annoying)?
+                    <div className="story-field">
+                        <label className="story-label">
+                            What moment made you feel something or had tension?
                         </label>
                         <textarea
+                            className="story-textarea"
                             value={stories.tension}
                             onChange={(e) => setStories({ ...stories, tension: e.target.value })}
-                            placeholder="Write your thoughts here..."
+                            placeholder="Write your thoughts..."
                         />
                     </div>
 
-                    <div className="story-question">
-                        <label className="story-question-label">
-                            What's one specific detail or moment I will forget by tomorrow but would be fun to retell?
+                    <div className="story-field">
+                        <label className="story-label">
+                            What's one specific detail you'll forget by tomorrow?
                         </label>
                         <textarea
+                            className="story-textarea"
                             value={stories.detail}
                             onChange={(e) => setStories({ ...stories, detail: e.target.value })}
-                            placeholder="Write your thoughts here..."
+                            placeholder="Write your thoughts..."
                         />
                     </div>
 
-                    <button 
-                        className="btn" 
-                        onClick={saveStories}
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Save Stories'}
+                    <button className="btn" onClick={saveStories}>
+                        Save Stories
                     </button>
                 </div>
             );
         }
 
         function Archive() {
-            const [archiveDates, setArchiveDates] = useState([]);
+            const [dates, setDates] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
             const [archiveData, setArchiveData] = useState(null);
 
             useEffect(() => {
-                loadArchiveDates();
+                loadDates();
             }, []);
 
-            async function loadArchiveDates() {
-                const user = (await supabase.auth.getUser()).data.user;
-                
-                const { data: taskDates } = await supabase
-                    .from('tasks')
-                    .select('date')
-                    .eq('user_id', user.id)
-                    .order('date', { ascending: false });
+            async function loadDates() {
+                try {
+                    const user = (await supabase.auth.getUser()).data.user;
+                    
+                    const { data: taskDates } = await supabase
+                        .from('tasks')
+                        .select('date')
+                        .eq('user_id', user.id)
+                        .order('date', { ascending: false });
 
-                const { data: storyDates } = await supabase
-                    .from('stories')
-                    .select('date')
-                    .eq('user_id', user.id)
-                    .order('date', { ascending: false });
+                    const { data: storyDates } = await supabase
+                        .from('stories')
+                        .select('date')
+                        .eq('user_id', user.id)
+                        .order('date', { ascending: false });
 
-                const allDates = new Set([
-                    ...(taskDates?.map(t => t.date) || []),
-                    ...(storyDates?.map(s => s.date) || [])
-                ]);
+                    const allDates = new Set([
+                        ...(taskDates?.map(t => t.date) || []),
+                        ...(storyDates?.map(s => s.date) || [])
+                    ]);
 
-                const dates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
-                setArchiveDates(dates.slice(0, 30));
-                
-                if (dates.length > 0 && !selectedDate) {
-                    setSelectedDate(dates[0]);
-                    loadArchiveForDate(dates[0]);
+                    const sortedDates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
+                    setDates(sortedDates.slice(0, 30));
+                    
+                    if (sortedDates.length > 0) {
+                        loadArchiveForDate(sortedDates[0]);
+                    }
+                } catch (err) {
+                    console.error('Error loading dates:', err);
                 }
             }
 
             async function loadArchiveForDate(date) {
                 setSelectedDate(date);
-                const user = (await supabase.auth.getUser()).data.user;
+                
+                try {
+                    const user = (await supabase.auth.getUser()).data.user;
 
-                const { data: tasks } = await supabase
-                    .from('tasks')
-                    .select('*, sections(name)')
-                    .eq('user_id', user.id)
-                    .eq('date', date);
+                    const { data: tasks } = await supabase
+                        .from('tasks')
+                        .select('*, sections(name)')
+                        .eq('user_id', user.id)
+                        .eq('date', date);
 
-                const { data: stories } = await supabase
-                    .from('stories')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('date', date)
-                    .single();
+                    const { data: stories } = await supabase
+                        .from('stories')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .eq('date', date)
+                        .single();
 
-                const tasksBySection = {};
-                tasks?.forEach(task => {
-                    const sectionName = task.sections?.name || 'Unknown';
-                    if (!tasksBySection[sectionName]) {
-                        tasksBySection[sectionName] = [];
-                    }
-                    tasksBySection[sectionName].push(task);
-                });
+                    const tasksBySection = {};
+                    tasks?.forEach(task => {
+                        const sectionName = task.sections?.name || 'Unknown';
+                        if (!tasksBySection[sectionName]) {
+                            tasksBySection[sectionName] = [];
+                        }
+                        tasksBySection[sectionName].push(task);
+                    });
 
-                setArchiveData({ tasks: tasksBySection, stories });
+                    setArchiveData({ tasks: tasksBySection, stories });
+                } catch (err) {
+                    console.error('Error loading archive:', err);
+                }
             }
 
             return (
-                <div className="archive-container">
-                    <div className="archive-header">
-                        <h2 className="archive-title">📚 Archive</h2>
+                <div className="archive">
+                    <div className="section-header">
+                        <h2 className="section-title" style={{color: 'var(--cyan)'}}>📚 Archive</h2>
                     </div>
 
-                    <div className="date-selector">
-                        {archiveDates.map(date => (
+                    <div className="archive-dates">
+                        {dates.map(date => (
                             <button
                                 key={date}
                                 className={`date-btn ${selectedDate === date ? 'active' : ''}`}
@@ -1866,8 +1412,8 @@
                     </div>
 
                     {archiveData && selectedDate && (
-                        <div className="archive-day">
-                            <h3 className="archive-day-header">
+                        <div>
+                            <h3 className="archive-day-title">
                                 {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
                                     weekday: 'long',
                                     year: 'numeric',
@@ -1878,75 +1424,59 @@
 
                             {Object.keys(archiveData.tasks).length > 0 && (
                                 <div>
-                                    {Object.entries(archiveData.tasks).map(([sectionName, tasks]) => {
-                                        const parentTasks = tasks.filter(t => !t.parent_task_id);
-                                        const getSubtasks = (parentId) => tasks.filter(t => t.parent_task_id === parentId);
-                                        
-                                        return (
-                                            <div key={sectionName} className="archive-section">
-                                                <h4 className="archive-section-title">{sectionName}</h4>
-                                                <ul className="task-list">
-                                                    {parentTasks.map(task => (
-                                                        <React.Fragment key={task.id}>
-                                                            <li className={`task-item ${task.completed ? 'completed' : ''}`}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="checkbox"
-                                                                    checked={task.completed}
-                                                                    disabled
-                                                                />
-                                                                <span className="task-text">{task.text}</span>
-                                                                {task.template_id && (
-                                                                    <span className="task-badge">DAILY</span>
-                                                                )}
-                                                            </li>
-                                                            {getSubtasks(task.id).map(subtask => (
-                                                                <li key={subtask.id} className={`task-item subtask-item ${subtask.completed ? 'completed' : ''}`}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="checkbox"
-                                                                        checked={subtask.completed}
-                                                                        disabled
-                                                                    />
-                                                                    <span className="task-text">{subtask.text}</span>
-                                                                </li>
-                                                            ))}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        );
-                                    })}
+                                    {Object.entries(archiveData.tasks).map(([sectionName, tasks]) => (
+                                        <div key={sectionName} className="archive-section">
+                                            <h4 className="archive-section-title">{sectionName}</h4>
+                                            <ul className="task-list">
+                                                {tasks.map(task => (
+                                                    <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="checkbox"
+                                                            checked={task.completed}
+                                                            disabled
+                                                        />
+                                                        <div className="task-content">
+                                                            <span className="task-text">{task.text}</span>
+                                                        </div>
+                                                        <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
+                                                            {task.template_id ? 'Daily' : 'One-Time'}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 
                             {archiveData.stories && (
                                 <div className="archive-section">
-                                    <h4 className="archive-section-title" style={{color: 'var(--accent-yellow)'}}>
+                                    <h4 className="archive-section-title" style={{color: 'var(--gold)'}}>
                                         📖 Stories
                                     </h4>
                                     {archiveData.stories.different && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '0.25rem'}}>
-                                                What was different, unexpected, or slightly off?
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                                What was different?
                                             </div>
-                                            <div style={{color: 'var(--text-primary)'}}>{archiveData.stories.different}</div>
+                                            <div>{archiveData.stories.different}</div>
                                         </div>
                                     )}
                                     {archiveData.stories.tension && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '0.25rem'}}>
-                                                What moment had tension?
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                                What had tension?
                                             </div>
-                                            <div style={{color: 'var(--text-primary)'}}>{archiveData.stories.tension}</div>
+                                            <div>{archiveData.stories.tension}</div>
                                         </div>
                                     )}
                                     {archiveData.stories.detail && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '0.25rem'}}>
-                                                What specific detail would be fun to retell?
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                                What specific detail?
                                             </div>
-                                            <div style={{color: 'var(--text-primary)'}}>{archiveData.stories.detail}</div>
+                                            <div>{archiveData.stories.detail}</div>
                                         </div>
                                     )}
                                 </div>
