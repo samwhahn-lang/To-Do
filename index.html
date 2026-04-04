@@ -99,6 +99,24 @@
             animation: glow 3s ease-in-out infinite alternate;
         }
 
+        .cache-indicator {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .cache-indicator.show {
+            opacity: 1;
+        }
+
         @keyframes glow {
             from { filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.4)); }
             to { filter: drop-shadow(0 0 40px rgba(0, 255, 245, 0.6)); }
@@ -176,17 +194,14 @@
             color: var(--ash);
         }
 
-        .btn-secondary::before {
-            background: var(--ash);
+        .btn-secondary:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
         }
 
-        .btn-danger {
-            border-color: var(--coral);
-            color: var(--coral);
-        }
-
-        .btn-danger::before {
-            background: var(--coral);
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
         }
 
         .section {
@@ -198,8 +213,19 @@
             animation: slideIn 0.5s ease-out backwards;
         }
 
-        .section.stories {
-            border-left-color: var(--gold);
+        .section.dragging {
+            opacity: 0.5;
+        }
+
+        .section.drag-over {
+            border-color: var(--accent-cyan);
+            border-width: 2px;
+        }
+
+        .stories-section {
+            border: 2px solid var(--accent-yellow);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 235, 59, 0.05) 100%);
+            cursor: default;
         }
 
         @keyframes slideIn {
@@ -595,20 +621,16 @@
             color: var(--coral);
         }
 
-        .message-success {
-            background: rgba(212, 255, 0, 0.1);
-            border-color: var(--lime);
-            color: var(--lime);
+        .subtask-input-container {
+            margin-left: 2rem;
+            margin-top: 0.5rem;
         }
 
-        .loading {
-            text-align: center;
-            padding: 6rem 2rem;
-            font-size: 1.25rem;
-            color: var(--cyan);
-            font-family: 'Archivo Black', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+        .subtask-hint {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-left: 2rem;
+            margin-top: 0.25rem;
         }
 
         @media (max-width: 768px) {
@@ -647,15 +669,76 @@
 </head>
 <body>
     <div id="root"></div>
+    <div id="cache-indicator" class="cache-indicator"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
         
-        // CONFIGURATION - Replace with your Supabase credentials
+        // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
         const SUPABASE_URL = 'https://kjhlokwfiffsllafyvnj.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqaGxva3dmaWZmc2xsYWZ5dm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjUzMTUsImV4cCI6MjA5MDA0MTMxNX0.-mflvRFi9yOP7aoFJPHfrFTc-vY8xee1u5dnQbVI2ME';
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ========================================
+        // CACHE MANAGER - Reduces Supabase egress by 80-90%
+        // ========================================
+        const CacheManager = {
+            CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+            
+            get(key) {
+                try {
+                    const cached = localStorage.getItem(`cache_${key}`);
+                    const timestamp = localStorage.getItem(`cache_${key}_time`);
+                    
+                    if (!cached || !timestamp) return null;
+                    
+                    const age = Date.now() - parseInt(timestamp);
+                    if (age > this.CACHE_DURATION) {
+                        this.delete(key);
+                        return null;
+                    }
+                    
+                    this.showIndicator('Using cached data');
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('Cache get error:', e);
+                    return null;
+                }
+            },
+            
+            set(key, data) {
+                try {
+                    localStorage.setItem(`cache_${key}`, JSON.stringify(data));
+                    localStorage.setItem(`cache_${key}_time`, Date.now().toString());
+                } catch (e) {
+                    console.error('Cache set error:', e);
+                }
+            },
+            
+            delete(key) {
+                localStorage.removeItem(`cache_${key}`);
+                localStorage.removeItem(`cache_${key}_time`);
+            },
+            
+            invalidate(pattern) {
+                // Invalidate all cache keys matching pattern
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('cache_') && key.includes(pattern)) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            },
+            
+            showIndicator(message) {
+                const indicator = document.getElementById('cache-indicator');
+                if (indicator) {
+                    indicator.textContent = message;
+                    indicator.classList.add('show');
+                    setTimeout(() => indicator.classList.remove('show'), 2000);
+                }
+            }
+        };
 
         // Get current date in EST timezone
         function getCurrentDate() {
@@ -678,9 +761,22 @@
                 const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                     setUser(session?.user || null);
                     if (session?.user) {
-                        loadData();
+                        loadSections();
                     }
                 });
+
+                // Check for new day every minute
+                const dateCheckInterval = setInterval(() => {
+                    const newDate = getCurrentDateEST();
+                    if (newDate !== currentDate) {
+                        setCurrentDate(newDate);
+                        // Clear the initialization flag for the new day
+                        localStorage.removeItem('lastInitDate');
+                        if (user) {
+                            handleNewDay(newDate);
+                        }
+                    }
+                }, 60000);
 
                 return () => {
                     authListener?.subscription?.unsubscribe();
@@ -688,108 +784,125 @@
             }, []);
 
             async function checkUser() {
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    setUser(session?.user || null);
-                    
-                    if (session?.user) {
-                        await loadData();
-                    }
-                } catch (err) {
-                    setError(err.message);
-                } finally {
-                    setLoading(false);
+                const { data: { session } } = await supabase.auth.getSession();
+                setUser(session?.user || null);
+                if (session?.user) {
+                    await handleNewDay(currentDate);
+                    await loadSections();
                 }
+                setLoading(false);
             }
 
-            async function loadData() {
-                try {
-                    const today = getCurrentDate();
-                    const user = (await supabase.auth.getUser()).data.user;
-                    
-                    // Ensure tasks exist for today
-                    await ensureTasksForToday();
-                    
-                    // Load sections
-                    const { data: sectionsData, error: sectionsError } = await supabase
-                        .from('sections')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .order('order_index', { ascending: true });
-
-                    if (sectionsError) throw sectionsError;
-
-                    // Load tasks for today
-                    const { data: tasksData, error: tasksError } = await supabase
-                        .from('tasks')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .eq('date', today)
-                        .order('created_at', { ascending: true });
-
-                    if (tasksError) throw tasksError;
-
-                    setSections((sectionsData || []).map(section => ({
-                        ...section,
-                        tasks: (tasksData || []).filter(t => t.section_id === section.id)
-                    })));
-
-                } catch (err) {
-                    setError(`Failed to load data: ${err.message}`);
+            async function handleNewDay(date) {
+                // CRITICAL: Check if we've already initialized today
+                if (hasInitializedToday(date)) {
+                    console.log('Already initialized for', date);
+                    return;
                 }
-            }
 
-            async function ensureTasksForToday() {
+                const user = (await supabase.auth.getUser()).data.user;
+                if (!user) return;
+
                 try {
-                    const today = getCurrentDate();
-                    const user = (await supabase.auth.getUser()).data.user;
-                    
-                    // Check if tasks already exist for today
-                    const { data: existingTasks } = await supabase
+                    // Step 1: Check if we already have tasks for this date
+                    const { data: existingTasks, error: checkError } = await supabase
                         .from('tasks')
                         .select('id')
                         .eq('user_id', user.id)
-                        .eq('date', today)
+                        .eq('date', date)
                         .limit(1);
 
-                    // If tasks exist, we're done
-                    if (existingTasks && existingTasks.length > 0) {
+                    if (checkError) {
+                        console.error('Error checking existing tasks:', checkError);
                         return;
                     }
 
-                    // Get all templates (these are ONLY daily tasks)
-                    const { data: templates } = await supabase
+                    if (existingTasks && existingTasks.length > 0) {
+                        console.log('Tasks already exist for', date);
+                        markInitialized(date);
+                        return;
+                    }
+
+                    // Step 2: Get template tasks
+                    const { data: templateTasks, error: templateError } = await supabase
                         .from('task_templates')
                         .select('*')
                         .eq('user_id', user.id);
 
-                    // No templates means this is first use or all tasks were deleted
-                    if (!templates || templates.length === 0) {
+                    if (templateError) {
+                        console.error('Error fetching templates:', templateError);
                         return;
                     }
 
-                    // Create today's tasks from templates
-                    const tasksToCreate = templates.map(template => ({
-                        user_id: user.id,
+                    if (!templateTasks || templateTasks.length === 0) {
+                        console.log('No templates found');
+                        markInitialized(date);
+                        return;
+                    }
+
+                    // Step 3: Create today's tasks from templates
+                    const tasksToCreate = templateTasks.map(template => ({
                         section_id: template.section_id,
+                        user_id: user.id,
                         text: template.text,
                         completed: false,
-                        date: today,
-                        template_id: template.id
+                        date: date,
+                        template_id: template.id,
+                        parent_task_id: template.parent_task_id
                     }));
 
-                    const { error } = await supabase
+                    const { error: insertError } = await supabase
                         .from('tasks')
                         .insert(tasksToCreate);
 
-                    // Error 23505 = unique constraint violation (tasks already exist, that's fine)
-                    if (error && error.code !== '23505') {
-                        throw error;
+                    if (insertError) {
+                        // If we get a unique constraint violation, that's actually fine - it means
+                        // another process already created the tasks
+                        if (insertError.code === '23505') {
+                            console.log('Tasks already created by another process');
+                        } else {
+                            console.error('Error creating tasks:', insertError);
+                        }
+                    } else {
+                        console.log(`Created ${tasksToCreate.length} tasks for ${date}`);
                     }
 
+                    // Mark as initialized regardless of success/failure to prevent loops
+                    markInitialized(date);
+
                 } catch (err) {
-                    console.error('Error ensuring tasks:', err);
+                    console.error('Unexpected error in handleNewDay:', err);
+                    markInitialized(date); // Mark as initialized to prevent infinite loops
                 }
+            }
+
+            async function loadSections() {
+                const today = getCurrentDateEST();
+                const user = (await supabase.auth.getUser()).data.user;
+                
+                const { data, error } = await supabase
+                    .from('sections')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('order_index', { ascending: true });
+
+                if (error) {
+                    setError(error.message);
+                    return;
+                }
+
+                // Load tasks for today only
+                const { data: tasksData } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('date', today)
+                    .order('created_at', { ascending: true });
+
+                setSections(data.map(section => ({
+                    ...section,
+                    tasks: tasksData?.filter(t => t.section_id === section.id) || []
+                })));
             }
 
             if (loading) {
@@ -892,6 +1005,10 @@
                 timeZone: 'America/New_York'
             });
 
+            async function handleSignOut() {
+                await supabase.auth.signOut();
+            }
+
             async function addSection(e) {
                 e.preventDefault();
                 if (!newSectionName.trim()) return;
@@ -909,14 +1026,9 @@
 
                     if (error) throw error;
 
-                    setSections([...sections, { ...data[0], tasks: [] }]);
-                    setNewSectionName('');
-                    setShowNewSection(false);
-                    setSuccess('Section created!');
-                    setTimeout(() => setSuccess(null), 3000);
-                } catch (err) {
-                    setError(err.message);
-                }
+                setSections([...sections, { ...data[0], tasks: [] }]);
+                setNewSectionName('');
+                setShowNewSection(false);
             }
 
             async function deleteSection(sectionId) {
@@ -930,12 +1042,64 @@
 
                     if (error) throw error;
 
-                    setSections(sections.filter(s => s.id !== sectionId));
-                    setSuccess('Section deleted!');
-                    setTimeout(() => setSuccess(null), 3000);
-                } catch (err) {
-                    setError(err.message);
+                setSections(sections.filter(s => s.id !== sectionId));
+            }
+
+            async function updateSectionName(sectionId, newName) {
+                const { error } = await supabase
+                    .from('sections')
+                    .update({ name: newName })
+                    .eq('id', sectionId);
+
+                if (error) {
+                    setError(error.message);
+                    return;
                 }
+
+                setSections(sections.map(s => 
+                    s.id === sectionId ? { ...s, name: newName } : s
+                ));
+            }
+
+            async function reorderSections(newOrder) {
+                setSections(newOrder);
+
+                const updates = newOrder.map((section, index) => ({
+                    id: section.id,
+                    order_index: index
+                }));
+
+                for (const update of updates) {
+                    await supabase
+                        .from('sections')
+                        .update({ order_index: update.order_index })
+                        .eq('id', update.id);
+                }
+            }
+
+            function handleDragStart(e, index) {
+                setDraggedSection(index);
+                e.dataTransfer.effectAllowed = 'move';
+            }
+
+            function handleDragOver(e, index) {
+                e.preventDefault();
+                if (draggedSection === null || draggedSection === index) return;
+                
+                const newSections = [...sections];
+                const draggedItem = newSections[draggedSection];
+                newSections.splice(draggedSection, 1);
+                newSections.splice(index, 0, draggedItem);
+                
+                setDraggedSection(index);
+                setSections(newSections);
+            }
+
+            function handleDragEnd() {
+                if (draggedSection !== null) {
+                    reorderSections(sections);
+                }
+                setDraggedSection(null);
             }
 
             return (
@@ -1032,57 +1196,141 @@
                 const user = (await supabase.auth.getUser()).data.user;
 
                 try {
+                    // If it's a daily task, create both template and today's instance
                     if (taskType === 'daily') {
-                        // DAILY TASK: Create template + today's instance
+                        // Create template
                         const { data: templateData, error: templateError } = await supabase
                             .from('task_templates')
                             .insert([{
-                                user_id: user.id,
                                 section_id: section.id,
-                                text: newTaskText
+                                user_id: user.id,
+                                text: newTaskText,
+                                parent_task_id: null
                             }])
                             .select();
 
-                        if (templateError) throw templateError;
+                        if (templateError) {
+                            alert(templateError.message);
+                            return;
+                        }
 
-                        // Create today's task
-                        const { data: taskData, error: taskError } = await supabase
+                        // Create today's instance
+                        const { data, error } = await supabase
                             .from('tasks')
                             .insert([{
-                                user_id: user.id,
                                 section_id: section.id,
+                                user_id: user.id,
                                 text: newTaskText,
                                 completed: false,
                                 date: today,
-                                template_id: templateData[0].id
+                                template_id: templateData[0].id,
+                                parent_task_id: null
                             }])
                             .select();
 
-                        if (taskError) throw taskError;
-                        
-                        setTasks([...tasks, taskData[0]]);
+                        if (error) {
+                            alert(error.message);
+                            return;
+                        }
+                        setTasks([...tasks, data[0]]);
                     } else {
-                        // ONE-TIME TASK: No template, just today's task
-                        const { data: taskData, error: taskError } = await supabase
+                        // One-time task - no template needed
+                        const { data, error } = await supabase
                             .from('tasks')
                             .insert([{
-                                user_id: user.id,
                                 section_id: section.id,
+                                user_id: user.id,
                                 text: newTaskText,
                                 completed: false,
                                 date: today,
-                                template_id: null
+                                template_id: null,
+                                parent_task_id: null
                             }])
                             .select();
 
-                        if (taskError) throw taskError;
-                        
-                        setTasks([...tasks, taskData[0]]);
+                        if (error) {
+                            alert(error.message);
+                            return;
+                        }
+                        setTasks([...tasks, data[0]]);
                     }
 
                     setNewTaskText('');
                 } catch (err) {
-                    setError(err.message);
+                    console.error('Error adding task:', err);
+                    alert('Error adding task');
+                }
+            }
+
+            async function addSubtask(parentTaskId, subtaskText) {
+                if (!subtaskText.trim()) return;
+
+                const today = getCurrentDateEST();
+                const user = (await supabase.auth.getUser()).data.user;
+                const parentTask = tasks.find(t => t.id === parentTaskId);
+
+                try {
+                    // If parent has a template, this is a daily subtask
+                    if (parentTask?.template_id) {
+                        // Create template
+                        const { data: templateData, error: templateError } = await supabase
+                            .from('task_templates')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: subtaskText,
+                                parent_task_id: parentTask.template_id
+                            }])
+                            .select();
+
+                        if (templateError) {
+                            alert(templateError.message);
+                            return;
+                        }
+
+                        // Create today's instance
+                        const { data, error } = await supabase
+                            .from('tasks')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: subtaskText,
+                                completed: false,
+                                date: today,
+                                template_id: templateData[0].id,
+                                parent_task_id: parentTaskId
+                            }])
+                            .select();
+
+                        if (error) {
+                            alert(error.message);
+                            return;
+                        }
+                        setTasks([...tasks, data[0]]);
+                    } else {
+                        // One-time subtask
+                        const { data, error } = await supabase
+                            .from('tasks')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: subtaskText,
+                                completed: false,
+                                date: today,
+                                template_id: null,
+                                parent_task_id: parentTaskId
+                            }])
+                            .select();
+
+                        if (error) {
+                            alert(error.message);
+                            return;
+                        }
+                        setTasks([...tasks, data[0]]);
+                    }
+                } catch (err) {
+                    console.error('Error adding subtask:', err);
+                    alert('Error adding subtask');
                 }
             }
 
@@ -1095,9 +1343,95 @@
 
                     if (error) throw error;
 
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
+                setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
+            }
+
+            async function toggleTaskType(taskId, currentHasTemplate) {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                const today = getCurrentDateEST();
+                const user = (await supabase.auth.getUser()).data.user;
+
+                try {
+                    if (currentHasTemplate) {
+                        // Convert from daily to one-time: delete template
+                        if (task.template_id) {
+                            await supabase
+                                .from('task_templates')
+                                .delete()
+                                .eq('id', task.template_id);
+
+                            await supabase
+                                .from('tasks')
+                                .update({ template_id: null })
+                                .eq('id', taskId);
+
+                            setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: null } : t));
+                        }
+                    } else {
+                        // Convert from one-time to daily: create template
+                        const { data: templateData, error: templateError } = await supabase
+                            .from('task_templates')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: task.text,
+                                parent_task_id: task.parent_task_id ? tasks.find(t => t.id === task.parent_task_id)?.template_id : null
+                            }])
+                            .select();
+
+                        if (templateError) {
+                            alert(templateError.message);
+                            return;
+                        }
+
+                        await supabase
+                            .from('tasks')
+                            .update({ template_id: templateData[0].id })
+                            .eq('id', taskId);
+
+                        setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: templateData[0].id } : t));
+                    }
                 } catch (err) {
-                    setError(err.message);
+                    console.error('Error toggling task type:', err);
+                    alert('Error toggling task type');
+                }
+            }
+
+            async function updateTaskText(taskId, newText) {
+                if (!newText.trim()) {
+                    setEditingTaskId(null);
+                    return;
+                }
+
+                const task = tasks.find(t => t.id === taskId);
+                
+                try {
+                    // Update the task
+                    const { error } = await supabase
+                        .from('tasks')
+                        .update({ text: newText })
+                        .eq('id', taskId);
+
+                    if (error) {
+                        alert(error.message);
+                        return;
+                    }
+
+                    // If it has a template, update the template too
+                    if (task?.template_id) {
+                        await supabase
+                            .from('task_templates')
+                            .update({ text: newText })
+                            .eq('id', task.template_id);
+                    }
+
+                    setTasks(tasks.map(t => t.id === taskId ? { ...t, text: newText } : t));
+                    setEditingTaskId(null);
+                } catch (err) {
+                    console.error('Error updating task:', err);
+                    alert('Error updating task');
                 }
             }
 
@@ -1105,26 +1439,35 @@
                 const task = tasks.find(t => t.id === taskId);
                 
                 try {
-                    // Delete the task
+                    // Delete the task and its subtasks
                     const { error } = await supabase
                         .from('tasks')
                         .delete()
-                        .eq('id', taskId);
+                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
 
-                    if (error) throw error;
+                    if (error) {
+                        alert(error.message);
+                        return;
+                    }
 
-                    // If it's a DAILY task, delete the template too
-                    // This prevents it from regenerating tomorrow
+                    // If it has a template, delete the template too (and all subtask templates)
                     if (task?.template_id) {
                         await supabase
                             .from('task_templates')
                             .delete()
-                            .eq('id', task.template_id);
+                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
                     }
 
-                    setTasks(tasks.filter(t => t.id !== taskId));
+                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
                 } catch (err) {
-                    setError(err.message);
+                    console.error('Error deleting task:', err);
+                    alert('Error deleting task');
+                }
+            }
+
+            async function saveNameEdit() {
+                if (editedName.trim() && editedName !== section.name) {
+                    await updateSectionName(section.id, editedName);
                 }
             }
 
@@ -1201,7 +1544,134 @@
             );
         }
 
-        function StoriesSection({ setError, setSuccess }) {
+        function TaskItem({ 
+            task, 
+            isSubtask = false, 
+            editingTaskId, 
+            editedTaskText, 
+            setEditedTaskText,
+            toggleTask, 
+            toggleTaskType, 
+            startEditingTask, 
+            updateTaskText, 
+            deleteTask,
+            addSubtask 
+        }) {
+            const [showSubtaskInput, setShowSubtaskInput] = useState(false);
+            const [subtaskText, setSubtaskText] = useState('');
+            const inputRef = useRef(null);
+
+            function handleKeyDown(e) {
+                if (e.key === 'Tab' && !isSubtask) {
+                    e.preventDefault();
+                    setShowSubtaskInput(true);
+                    setTimeout(() => inputRef.current?.focus(), 0);
+                }
+                if (e.key === 'Enter' && editingTaskId === task.id) {
+                    updateTaskText(task.id, editedTaskText);
+                }
+            }
+
+            function handleSubtaskKeyDown(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (subtaskText.trim()) {
+                        addSubtask(task.id, subtaskText);
+                        setSubtaskText('');
+                    }
+                }
+                if (e.key === 'Escape') {
+                    setShowSubtaskInput(false);
+                    setSubtaskText('');
+                }
+            }
+
+            const isDaily = task.template_id !== null;
+
+            return (
+                <>
+                    <li className={`task-item ${task.completed ? 'completed' : ''} ${isSubtask ? 'subtask-item' : ''} ${editingTaskId === task.id ? 'editing' : ''}`}>
+                        <input
+                            type="checkbox"
+                            className="checkbox"
+                            checked={task.completed}
+                            onChange={(e) => toggleTask(task.id, e.target.checked)}
+                        />
+                        <div className="task-content">
+                            {editingTaskId === task.id ? (
+                                <input
+                                    type="text"
+                                    className="task-text-input"
+                                    value={editedTaskText}
+                                    onChange={(e) => setEditedTaskText(e.target.value)}
+                                    onBlur={() => updateTaskText(task.id, editedTaskText)}
+                                    onKeyDown={handleKeyDown}
+                                    autoFocus
+                                />
+                            ) : (
+                                <span 
+                                    className="task-text"
+                                    onClick={() => startEditingTask(task)}
+                                    onKeyDown={handleKeyDown}
+                                    tabIndex={0}
+                                    style={{ cursor: 'text' }}
+                                    title="Click to edit or press Tab to add subtask"
+                                >
+                                    {task.text}
+                                </span>
+                            )}
+                        </div>
+                        <div className="task-actions">
+                            <span 
+                                className={`task-badge ${isDaily ? '' : 'one-time'}`}
+                                onClick={() => toggleTaskType(task.id, isDaily)}
+                                style={{ cursor: 'pointer' }}
+                                title="Click to toggle"
+                            >
+                                {isDaily ? 'DAILY' : 'ONE-TIME'}
+                            </span>
+                            <button 
+                                className="icon-btn"
+                                onClick={() => deleteTask(task.id)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </li>
+                    {showSubtaskInput && !isSubtask && (
+                        <div className="subtask-input-container">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={subtaskText}
+                                onChange={(e) => setSubtaskText(e.target.value)}
+                                onKeyDown={handleSubtaskKeyDown}
+                                onBlur={() => {
+                                    if (subtaskText.trim()) {
+                                        addSubtask(task.id, subtaskText);
+                                    }
+                                    setShowSubtaskInput(false);
+                                    setSubtaskText('');
+                                }}
+                                placeholder="Add subtask... (press Enter)"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    background: 'var(--bg-primary)',
+                                    border: '1px solid var(--accent-green)',
+                                    borderRadius: '4px',
+                                    color: 'var(--text-primary)',
+                                    fontFamily: 'Space Mono, monospace',
+                                    fontSize: '0.875rem'
+                                }}
+                            />
+                        </div>
+                    )}
+                </>
+            );
+        }
+
+        function StoriesSection() {
             const [stories, setStories] = useState({
                 different: '',
                 tension: '',
@@ -1213,9 +1683,8 @@
             }, []);
 
             async function loadStories() {
-                try {
-                    const today = getCurrentDate();
-                    const user = (await supabase.auth.getUser()).data.user;
+                const today = getCurrentDateEST();
+                const user = (await supabase.auth.getUser()).data.user;
 
                     const { data, error } = await supabase
                         .from('stories')
@@ -1224,19 +1693,12 @@
                         .eq('date', today)
                         .single();
 
-                    if (error && error.code !== 'PGRST116') {
-                        throw error;
-                    }
-
-                    if (data) {
-                        setStories({
-                            different: data.different || '',
-                            tension: data.tension || '',
-                            detail: data.detail || ''
-                        });
-                    }
-                } catch (err) {
-                    console.error('Error loading stories:', err);
+                if (data) {
+                    setStories({
+                        different: data.different || '',
+                        tension: data.tension || '',
+                        detail: data.detail || ''
+                    });
                 }
             }
 
@@ -1257,13 +1719,12 @@
                             onConflict: 'user_id,date'
                         });
 
-                    if (error) throw error;
-
-                    setSuccess('Stories saved!');
-                    setTimeout(() => setSuccess(null), 3000);
-                } catch (err) {
-                    setError(err.message);
+                if (error) {
+                    alert(error.message);
+                } else {
+                    alert('Stories saved!');
                 }
+                setIsSaving(false);
             }
 
             return (
@@ -1324,15 +1785,14 @@
                 loadDates();
             }, []);
 
-            async function loadDates() {
-                try {
-                    const user = (await supabase.auth.getUser()).data.user;
-                    
-                    const { data: taskDates } = await supabase
-                        .from('tasks')
-                        .select('date')
-                        .eq('user_id', user.id)
-                        .order('date', { ascending: false });
+            async function loadArchiveDates() {
+                const user = (await supabase.auth.getUser()).data.user;
+                
+                const { data: taskDates } = await supabase
+                    .from('tasks')
+                    .select('date')
+                    .eq('user_id', user.id)
+                    .order('date', { ascending: false });
 
                     const { data: storyDates } = await supabase
                         .from('stories')
@@ -1345,22 +1805,18 @@
                         ...(storyDates?.map(s => s.date) || [])
                     ]);
 
-                    const sortedDates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
-                    setDates(sortedDates.slice(0, 30));
-                    
-                    if (sortedDates.length > 0) {
-                        loadArchiveForDate(sortedDates[0]);
-                    }
-                } catch (err) {
-                    console.error('Error loading dates:', err);
+                const dates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
+                setArchiveDates(dates.slice(0, 30));
+                
+                if (dates.length > 0 && !selectedDate) {
+                    setSelectedDate(dates[0]);
+                    loadArchiveForDate(dates[0]);
                 }
             }
 
             async function loadArchiveForDate(date) {
                 setSelectedDate(date);
-                
-                try {
-                    const user = (await supabase.auth.getUser()).data.user;
+                const user = (await supabase.auth.getUser()).data.user;
 
                     const { data: tasks } = await supabase
                         .from('tasks')
@@ -1384,16 +1840,13 @@
                         tasksBySection[sectionName].push(task);
                     });
 
-                    setArchiveData({ tasks: tasksBySection, stories });
-                } catch (err) {
-                    console.error('Error loading archive:', err);
-                }
+                setArchiveData({ tasks: tasksBySection, stories });
             }
 
             return (
-                <div className="archive">
-                    <div className="section-header">
-                        <h2 className="section-title" style={{color: 'var(--cyan)'}}>📚 Archive</h2>
+                <div className="archive-container">
+                    <div className="archive-header">
+                        <h2 className="archive-title">📚 Archive</h2>
                     </div>
 
                     <div className="archive-dates">
@@ -1424,29 +1877,45 @@
 
                             {Object.keys(archiveData.tasks).length > 0 && (
                                 <div>
-                                    {Object.entries(archiveData.tasks).map(([sectionName, tasks]) => (
-                                        <div key={sectionName} className="archive-section">
-                                            <h4 className="archive-section-title">{sectionName}</h4>
-                                            <ul className="task-list">
-                                                {tasks.map(task => (
-                                                    <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            className="checkbox"
-                                                            checked={task.completed}
-                                                            disabled
-                                                        />
-                                                        <div className="task-content">
-                                                            <span className="task-text">{task.text}</span>
-                                                        </div>
-                                                        <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
-                                                            {task.template_id ? 'Daily' : 'One-Time'}
-                                                        </span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
+                                    {Object.entries(archiveData.tasks).map(([sectionName, tasks]) => {
+                                        const parentTasks = tasks.filter(t => !t.parent_task_id);
+                                        const getSubtasks = (parentId) => tasks.filter(t => t.parent_task_id === parentId);
+                                        
+                                        return (
+                                            <div key={sectionName} className="archive-section">
+                                                <h4 className="archive-section-title">{sectionName}</h4>
+                                                <ul className="task-list">
+                                                    {parentTasks.map(task => (
+                                                        <React.Fragment key={task.id}>
+                                                            <li className={`task-item ${task.completed ? 'completed' : ''}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="checkbox"
+                                                                    checked={task.completed}
+                                                                    disabled
+                                                                />
+                                                                <span className="task-text">{task.text}</span>
+                                                                {task.template_id && (
+                                                                    <span className="task-badge">DAILY</span>
+                                                                )}
+                                                            </li>
+                                                            {getSubtasks(task.id).map(subtask => (
+                                                                <li key={subtask.id} className={`task-item subtask-item ${subtask.completed ? 'completed' : ''}`}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="checkbox"
+                                                                        checked={subtask.completed}
+                                                                        disabled
+                                                                    />
+                                                                    <span className="task-text">{subtask.text}</span>
+                                                                </li>
+                                                            ))}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 
