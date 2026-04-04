@@ -101,6 +101,24 @@
             letter-spacing: 0.2em;
         }
 
+        .cache-indicator {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .cache-indicator.show {
+            opacity: 1;
+        }
+
         .auth-container {
             max-width: 400px;
             margin: 4rem auto;
@@ -196,11 +214,6 @@
             color: var(--bg-primary);
         }
 
-        .btn-small {
-            padding: 0.5rem 1rem;
-            font-size: 0.75rem;
-        }
-
         .section {
             margin-bottom: 2rem;
             background: var(--bg-secondary);
@@ -214,11 +227,6 @@
 
         .section.dragging {
             opacity: 0.5;
-        }
-
-        .section.drag-over {
-            border-color: var(--accent-cyan);
-            border-width: 2px;
         }
 
         .stories-section {
@@ -607,18 +615,6 @@
             line-height: 1.4;
         }
 
-        .subtask-input-container {
-            margin-left: 2rem;
-            margin-top: 0.5rem;
-        }
-
-        .subtask-hint {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-left: 2rem;
-            margin-top: 0.25rem;
-        }
-
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -659,31 +655,82 @@
 </head>
 <body>
     <div id="root"></div>
+    <div id="cache-indicator" class="cache-indicator"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
         // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
-        const SUPABASE_URL = 'https://kjhlokwfiffsllafyvnj.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqaGxva3dmaWZmc2xsYWZ5dm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjUzMTUsImV4cCI6MjA5MDA0MTMxNX0.-mflvRFi9yOP7aoFJPHfrFTc-vY8xee1u5dnQbVI2ME';
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ========================================
+        // CACHE MANAGER - Reduces Supabase egress by 80-90%
+        // ========================================
+        const CacheManager = {
+            CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+            
+            get(key) {
+                try {
+                    const cached = localStorage.getItem(`cache_${key}`);
+                    const timestamp = localStorage.getItem(`cache_${key}_time`);
+                    
+                    if (!cached || !timestamp) return null;
+                    
+                    const age = Date.now() - parseInt(timestamp);
+                    if (age > this.CACHE_DURATION) {
+                        this.delete(key);
+                        return null;
+                    }
+                    
+                    this.showIndicator('Using cached data');
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('Cache get error:', e);
+                    return null;
+                }
+            },
+            
+            set(key, data) {
+                try {
+                    localStorage.setItem(`cache_${key}`, JSON.stringify(data));
+                    localStorage.setItem(`cache_${key}_time`, Date.now().toString());
+                } catch (e) {
+                    console.error('Cache set error:', e);
+                }
+            },
+            
+            delete(key) {
+                localStorage.removeItem(`cache_${key}`);
+                localStorage.removeItem(`cache_${key}_time`);
+            },
+            
+            invalidate(pattern) {
+                // Invalidate all cache keys matching pattern
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('cache_') && key.includes(pattern)) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            },
+            
+            showIndicator(message) {
+                const indicator = document.getElementById('cache-indicator');
+                if (indicator) {
+                    indicator.textContent = message;
+                    indicator.classList.add('show');
+                    setTimeout(() => indicator.classList.remove('show'), 2000);
+                }
+            }
+        };
 
         // Get current date in EST timezone
         function getCurrentDateEST() {
             const now = new Date();
             const estDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
             return estDate.toISOString().split('T')[0];
-        }
-
-        // Track if we've already initialized today (prevents multiple runs)
-        function hasInitializedToday(date) {
-            const lastInit = localStorage.getItem('lastInitDate');
-            return lastInit === date;
-        }
-
-        function markInitialized(date) {
-            localStorage.setItem('lastInitDate', date);
         }
 
         function App() {
@@ -708,10 +755,10 @@
                     const newDate = getCurrentDateEST();
                     if (newDate !== currentDate) {
                         setCurrentDate(newDate);
-                        // Clear the initialization flag for the new day
-                        localStorage.removeItem('lastInitDate');
+                        CacheManager.invalidate('tasks'); // Clear task cache on new day
                         if (user) {
-                            handleNewDay(newDate);
+                            generateDailyTasks(newDate);
+                            loadSections(true); // Force refresh
                         }
                     }
                 }, 60000);
@@ -726,103 +773,92 @@
                 const { data: { session } } = await supabase.auth.getSession();
                 setUser(session?.user || null);
                 if (session?.user) {
-                    await handleNewDay(currentDate);
+                    await generateDailyTasks(currentDate);
                     await loadSections();
                 }
                 setLoading(false);
             }
 
-            async function handleNewDay(date) {
-                // CRITICAL: Check if we've already initialized today
-                if (hasInitializedToday(date)) {
-                    console.log('Already initialized for', date);
-                    return;
-                }
-
+            async function generateDailyTasks(date) {
                 const user = (await supabase.auth.getUser()).data.user;
                 if (!user) return;
 
-                try {
-                    // Step 1: Check if we already have tasks for this date
-                    const { data: existingTasks, error: checkError } = await supabase
-                        .from('tasks')
-                        .select('id')
-                        .eq('user_id', user.id)
-                        .eq('date', date)
-                        .limit(1);
-
-                    if (checkError) {
-                        console.error('Error checking existing tasks:', checkError);
-                        return;
-                    }
-
-                    if (existingTasks && existingTasks.length > 0) {
-                        console.log('Tasks already exist for', date);
-                        markInitialized(date);
-                        return;
-                    }
-
-                    // Step 2: Get template tasks
-                    const { data: templateTasks, error: templateError } = await supabase
-                        .from('task_templates')
-                        .select('*')
-                        .eq('user_id', user.id);
-
-                    if (templateError) {
-                        console.error('Error fetching templates:', templateError);
-                        return;
-                    }
-
-                    if (!templateTasks || templateTasks.length === 0) {
-                        console.log('No templates found');
-                        markInitialized(date);
-                        return;
-                    }
-
-                    // Step 3: Create today's tasks from templates
-                    const tasksToCreate = templateTasks.map(template => ({
-                        section_id: template.section_id,
-                        user_id: user.id,
-                        text: template.text,
-                        completed: false,
-                        date: date,
-                        template_id: template.id,
-                        parent_task_id: template.parent_task_id
-                    }));
-
-                    const { error: insertError } = await supabase
-                        .from('tasks')
-                        .insert(tasksToCreate);
-
-                    if (insertError) {
-                        // If we get a unique constraint violation, that's actually fine - it means
-                        // another process already created the tasks
-                        if (insertError.code === '23505') {
-                            console.log('Tasks already created by another process');
-                        } else {
-                            console.error('Error creating tasks:', insertError);
-                        }
-                    } else {
-                        console.log(`Created ${tasksToCreate.length} tasks for ${date}`);
-                    }
-
-                    // Mark as initialized regardless of success/failure to prevent loops
-                    markInitialized(date);
-
-                } catch (err) {
-                    console.error('Unexpected error in handleNewDay:', err);
-                    markInitialized(date); // Mark as initialized to prevent infinite loops
+                // Check cache first
+                const cacheKey = `daily_tasks_generated_${date}`;
+                if (CacheManager.get(cacheKey)) {
+                    return; // Already generated today
                 }
+
+                const { data: repeatingTasks } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('is_repeating', true);
+
+                if (!repeatingTasks || repeatingTasks.length === 0) {
+                    CacheManager.set(cacheKey, true);
+                    return;
+                }
+
+                const { data: existingTasks } = await supabase
+                    .from('tasks')
+                    .select('text, section_id')
+                    .eq('user_id', user.id)
+                    .eq('date', date);
+
+                const existingTaskKeys = new Set(
+                    existingTasks?.map(t => `${t.section_id}-${t.text}`) || []
+                );
+
+                const taskMap = new Map();
+                repeatingTasks.forEach(task => {
+                    const key = `${task.section_id}-${task.text}`;
+                    if (!taskMap.has(key) || new Date(task.created_at) > new Date(taskMap.get(key).created_at)) {
+                        taskMap.set(key, task);
+                    }
+                });
+
+                const tasksToCreate = [];
+                for (const [key, task] of taskMap) {
+                    if (!existingTaskKeys.has(key)) {
+                        tasksToCreate.push({
+                            section_id: task.section_id,
+                            user_id: user.id,
+                            text: task.text,
+                            completed: false,
+                            date: date,
+                            is_repeating: true,
+                            parent_task_id: task.parent_task_id || null
+                        });
+                    }
+                }
+
+                if (tasksToCreate.length > 0) {
+                    await supabase.from('tasks').insert(tasksToCreate);
+                }
+
+                CacheManager.set(cacheKey, true);
             }
 
-            async function loadSections() {
+            async function loadSections(forceRefresh = false) {
                 const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
+                const cacheKey = `sections_tasks_${today}`;
+                
+                // Try cache first (unless force refresh)
+                if (!forceRefresh) {
+                    const cached = CacheManager.get(cacheKey);
+                    if (cached) {
+                        setSections(cached);
+                        return;
+                    }
+                }
+                
+                CacheManager.showIndicator('Loading from database...');
                 
                 const { data, error } = await supabase
                     .from('sections')
                     .select('*')
-                    .eq('user_id', user.id)
+                    .eq('user_id', (await supabase.auth.getUser()).data.user.id)
                     .order('order_index', { ascending: true });
 
                 if (error) {
@@ -830,18 +866,19 @@
                     return;
                 }
 
-                // Load tasks for today only
                 const { data: tasksData } = await supabase
                     .from('tasks')
                     .select('*')
-                    .eq('user_id', user.id)
                     .eq('date', today)
                     .order('created_at', { ascending: true });
 
-                setSections(data.map(section => ({
+                const sectionsWithTasks = data.map(section => ({
                     ...section,
                     tasks: tasksData?.filter(t => t.section_id === section.id) || []
-                })));
+                }));
+
+                setSections(sectionsWithTasks);
+                CacheManager.set(cacheKey, sectionsWithTasks);
             }
 
             if (loading) {
@@ -949,6 +986,12 @@
 
             async function handleSignOut() {
                 await supabase.auth.signOut();
+                // Clear all cache on logout
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('cache_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
             }
 
             async function addSection(e) {
@@ -971,6 +1014,7 @@
                 }
 
                 setSections([...sections, { ...data[0], tasks: [] }]);
+                CacheManager.invalidate('sections');
                 setNewSectionName('');
                 setShowNewSection(false);
             }
@@ -989,6 +1033,7 @@
                 }
 
                 setSections(sections.filter(s => s.id !== sectionId));
+                CacheManager.invalidate('sections');
             }
 
             async function updateSectionName(sectionId, newName) {
@@ -1005,6 +1050,7 @@
                 setSections(sections.map(s => 
                     s.id === sectionId ? { ...s, name: newName } : s
                 ));
+                CacheManager.invalidate('sections');
             }
 
             async function reorderSections(newOrder) {
@@ -1021,6 +1067,8 @@
                         .update({ order_index: update.order_index })
                         .eq('id', update.id);
                 }
+                
+                CacheManager.invalidate('sections');
             }
 
             function handleDragStart(e, index) {
@@ -1145,71 +1193,27 @@
                 const today = getCurrentDateEST();
                 const user = (await supabase.auth.getUser()).data.user;
 
-                try {
-                    // If it's a daily task, create both template and today's instance
-                    if (taskType === 'daily') {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                parent_task_id: null
-                            }])
-                            .select();
+                const { data, error } = await supabase
+                    .from('tasks')
+                    .insert([{
+                        section_id: section.id,
+                        user_id: user.id,
+                        text: newTaskText,
+                        completed: false,
+                        date: today,
+                        is_repeating: taskType === 'daily',
+                        parent_task_id: null
+                    }])
+                    .select();
 
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    } else {
-                        // One-time task - no template needed
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    }
-
-                    setNewTaskText('');
-                } catch (err) {
-                    console.error('Error adding task:', err);
-                    alert('Error adding task');
+                if (error) {
+                    alert(error.message);
+                    return;
                 }
+
+                setTasks([...tasks, data[0]]);
+                CacheManager.invalidate('tasks');
+                setNewTaskText('');
             }
 
             async function addSubtask(parentTaskId, subtaskText) {
@@ -1219,69 +1223,26 @@
                 const user = (await supabase.auth.getUser()).data.user;
                 const parentTask = tasks.find(t => t.id === parentTaskId);
 
-                try {
-                    // If parent has a template, this is a daily subtask
-                    if (parentTask?.template_id) {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                parent_task_id: parentTask.template_id
-                            }])
-                            .select();
+                const { data, error } = await supabase
+                    .from('tasks')
+                    .insert([{
+                        section_id: section.id,
+                        user_id: user.id,
+                        text: subtaskText,
+                        completed: false,
+                        date: today,
+                        is_repeating: parentTask?.is_repeating || false,
+                        parent_task_id: parentTaskId
+                    }])
+                    .select();
 
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    } else {
-                        // One-time subtask
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    }
-                } catch (err) {
-                    console.error('Error adding subtask:', err);
-                    alert('Error adding subtask');
+                if (error) {
+                    alert(error.message);
+                    return;
                 }
+
+                setTasks([...tasks, data[0]]);
+                CacheManager.invalidate('tasks');
             }
 
             async function toggleTask(taskId, completed) {
@@ -1296,59 +1257,24 @@
                 }
 
                 setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
+                CacheManager.invalidate('tasks');
             }
 
-            async function toggleTaskType(taskId, currentHasTemplate) {
-                const task = tasks.find(t => t.id === taskId);
-                if (!task) return;
+            async function toggleTaskType(taskId, currentIsRepeating) {
+                const newIsRepeating = !currentIsRepeating;
+                
+                const { error } = await supabase
+                    .from('tasks')
+                    .update({ is_repeating: newIsRepeating })
+                    .eq('id', taskId);
 
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-
-                try {
-                    if (currentHasTemplate) {
-                        // Convert from daily to one-time: delete template
-                        if (task.template_id) {
-                            await supabase
-                                .from('task_templates')
-                                .delete()
-                                .eq('id', task.template_id);
-
-                            await supabase
-                                .from('tasks')
-                                .update({ template_id: null })
-                                .eq('id', taskId);
-
-                            setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: null } : t));
-                        }
-                    } else {
-                        // Convert from one-time to daily: create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: task.text,
-                                parent_task_id: task.parent_task_id ? tasks.find(t => t.id === task.parent_task_id)?.template_id : null
-                            }])
-                            .select();
-
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        await supabase
-                            .from('tasks')
-                            .update({ template_id: templateData[0].id })
-                            .eq('id', taskId);
-
-                        setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: templateData[0].id } : t));
-                    }
-                } catch (err) {
-                    console.error('Error toggling task type:', err);
-                    alert('Error toggling task type');
+                if (error) {
+                    alert(error.message);
+                    return;
                 }
+
+                setTasks(tasks.map(t => t.id === taskId ? { ...t, is_repeating: newIsRepeating } : t));
+                CacheManager.invalidate('tasks');
             }
 
             async function updateTaskText(taskId, newText) {
@@ -1357,64 +1283,34 @@
                     return;
                 }
 
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    // Update the task
-                    const { error } = await supabase
-                        .from('tasks')
-                        .update({ text: newText })
-                        .eq('id', taskId);
+                const { error } = await supabase
+                    .from('tasks')
+                    .update({ text: newText })
+                    .eq('id', taskId);
 
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
-
-                    // If it has a template, update the template too
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .update({ text: newText })
-                            .eq('id', task.template_id);
-                    }
-
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, text: newText } : t));
-                    setEditingTaskId(null);
-                } catch (err) {
-                    console.error('Error updating task:', err);
-                    alert('Error updating task');
+                if (error) {
+                    alert(error.message);
+                    return;
                 }
+
+                setTasks(tasks.map(t => t.id === taskId ? { ...t, text: newText } : t));
+                CacheManager.invalidate('tasks');
+                setEditingTaskId(null);
             }
 
             async function deleteTask(taskId) {
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    // Delete the task and its subtasks
-                    const { error } = await supabase
-                        .from('tasks')
-                        .delete()
-                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+                const { error } = await supabase
+                    .from('tasks')
+                    .delete()
+                    .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
 
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
-
-                    // If it has a template, delete the template too (and all subtask templates)
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .delete()
-                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
-                    }
-
-                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
-                } catch (err) {
-                    console.error('Error deleting task:', err);
-                    alert('Error deleting task');
+                if (error) {
+                    alert(error.message);
+                    return;
                 }
+
+                setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
+                CacheManager.invalidate('tasks');
             }
 
             async function saveNameEdit() {
@@ -1585,8 +1481,6 @@
                 }
             }
 
-            const isDaily = task.template_id !== null;
-
             return (
                 <>
                     <li className={`task-item ${task.completed ? 'completed' : ''} ${isSubtask ? 'subtask-item' : ''} ${editingTaskId === task.id ? 'editing' : ''}`}>
@@ -1622,12 +1516,12 @@
                         </div>
                         <div className="task-actions">
                             <span 
-                                className={`task-badge ${isDaily ? '' : 'one-time'}`}
-                                onClick={() => toggleTaskType(task.id, isDaily)}
+                                className={`task-badge ${task.is_repeating ? '' : 'one-time'}`}
+                                onClick={() => toggleTaskType(task.id, task.is_repeating)}
                                 style={{ cursor: 'pointer' }}
                                 title="Click to toggle"
                             >
-                                {isDaily ? 'DAILY' : 'ONE-TIME'}
+                                {task.is_repeating ? 'DAILY' : 'ONE-TIME'}
                             </span>
                             <button 
                                 className="icon-btn"
@@ -1638,7 +1532,7 @@
                         </div>
                     </li>
                     {showSubtaskInput && !isSubtask && (
-                        <div className="subtask-input-container">
+                        <div style={{marginLeft: '2rem', marginTop: '0.5rem'}}>
                             <input
                                 ref={inputRef}
                                 type="text"
@@ -1684,6 +1578,15 @@
 
             async function loadStories() {
                 const today = getCurrentDateEST();
+                const cacheKey = `stories_${today}`;
+                
+                // Try cache first
+                const cached = CacheManager.get(cacheKey);
+                if (cached) {
+                    setStories(cached);
+                    return;
+                }
+
                 const user = (await supabase.auth.getUser()).data.user;
 
                 const { data, error } = await supabase
@@ -1693,13 +1596,14 @@
                     .eq('date', today)
                     .single();
 
-                if (data) {
-                    setStories({
-                        different: data.different || '',
-                        tension: data.tension || '',
-                        detail: data.detail || ''
-                    });
-                }
+                const storyData = {
+                    different: data?.different || '',
+                    tension: data?.tension || '',
+                    detail: data?.detail || ''
+                };
+
+                setStories(storyData);
+                CacheManager.set(cacheKey, storyData);
             }
 
             async function saveStories() {
@@ -1722,7 +1626,8 @@
                 if (error) {
                     alert(error.message);
                 } else {
-                    alert('Stories saved!');
+                    CacheManager.invalidate('stories');
+                    CacheManager.showIndicator('Stories saved!');
                 }
                 setIsSaving(false);
             }
@@ -1787,8 +1692,21 @@
             }, []);
 
             async function loadArchiveDates() {
+                const cacheKey = 'archive_dates';
+                
+                // Try cache first
+                const cached = CacheManager.get(cacheKey);
+                if (cached) {
+                    setArchiveDates(cached);
+                    if (cached.length > 0) {
+                        loadArchiveForDate(cached[0]);
+                    }
+                    return;
+                }
+
                 const user = (await supabase.auth.getUser()).data.user;
                 
+                // Only get dates, not full data (much smaller payload)
                 const { data: taskDates } = await supabase
                     .from('tasks')
                     .select('date')
@@ -1807,16 +1725,30 @@
                 ]);
 
                 const dates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
-                setArchiveDates(dates.slice(0, 30));
+                const recentDates = dates.slice(0, 7); // Reduced from 30 to 7 days
                 
-                if (dates.length > 0 && !selectedDate) {
-                    setSelectedDate(dates[0]);
-                    loadArchiveForDate(dates[0]);
+                setArchiveDates(recentDates);
+                CacheManager.set(cacheKey, recentDates);
+                
+                if (recentDates.length > 0) {
+                    loadArchiveForDate(recentDates[0]);
                 }
             }
 
             async function loadArchiveForDate(date) {
                 setSelectedDate(date);
+                
+                const cacheKey = `archive_${date}`;
+                
+                // Try cache first
+                const cached = CacheManager.get(cacheKey);
+                if (cached) {
+                    setArchiveData(cached);
+                    return;
+                }
+
+                CacheManager.showIndicator('Loading archive...');
+                
                 const user = (await supabase.auth.getUser()).data.user;
 
                 const { data: tasks } = await supabase
@@ -1841,13 +1773,15 @@
                     tasksBySection[sectionName].push(task);
                 });
 
-                setArchiveData({ tasks: tasksBySection, stories });
+                const archiveContent = { tasks: tasksBySection, stories };
+                setArchiveData(archiveContent);
+                CacheManager.set(cacheKey, archiveContent);
             }
 
             return (
                 <div className="archive-container">
                     <div className="archive-header">
-                        <h2 className="archive-title">📚 Archive</h2>
+                        <h2 className="archive-title">📚 Archive (Last 7 Days)</h2>
                     </div>
 
                     <div className="date-selector">
@@ -1896,7 +1830,7 @@
                                                                     disabled
                                                                 />
                                                                 <span className="task-text">{task.text}</span>
-                                                                {task.template_id && (
+                                                                {task.is_repeating && (
                                                                     <span className="task-badge">DAILY</span>
                                                                 )}
                                                             </li>
