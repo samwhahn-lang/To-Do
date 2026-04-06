@@ -73,41 +73,6 @@
             padding: 3rem 2rem;
         }
 
-        .debug-banner {
-            background: rgba(255, 107, 107, 0.15);
-            border: 2px solid var(--coral);
-            color: var(--coral);
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-
-        .debug-banner h2 {
-            margin-bottom: 1rem;
-            font-size: 1.1rem;
-        }
-
-        .debug-banner code {
-            display: block;
-            background: var(--charcoal);
-            padding: 1rem;
-            margin: 0.75rem 0;
-            border-left: 2px solid var(--coral);
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .debug-banner p {
-            margin-bottom: 0.5rem;
-        }
-
-        .debug-banner a {
-            color: var(--cyan);
-            text-decoration: underline;
-        }
-
         .masthead {
             margin-bottom: 4rem;
             text-align: center;
@@ -611,6 +576,7 @@
         const { useState, useEffect } = React;
         
         // ⚠️ REPLACE THESE WITH YOUR NEW SUPABASE CREDENTIALS
+        
         const SUPABASE_URL = 'https://dgxtslpwsayucznkrqih.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRneHRzbHB3c2F5dWN6bmtycWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NzYxMTcsImV4cCI6MjA5MTA1MjExN30.sLiEngc7B5es_jMh_u8eaJNirUScg3cGqhO9_Ku8x-I';
         
@@ -627,64 +593,36 @@
         let initError = null;
 
         try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log('✅ Supabase client created');
+            // FIX: Add fetch polyfill for Worker compatibility
+            const originalFetch = window.fetch;
+            
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    autoRefreshToken: true,
+                    persistSession: true,
+                    detectSessionInUrl: true,
+                },
+                // CRITICAL FIX: Disable Web Crypto for Worker compatibility
+                global: {
+                    headers: {},
+                }
+            });
+            
+            console.log('✅ Supabase client created with Worker-safe config');
         } catch (err) {
             initError = err.message;
             console.error('❌ Failed to create Supabase client:', err);
         }
 
-        function DebugBanner() {
-            if (!initError && !hasDummyUrl && !hasDummyKey) {
-                return null; // No errors, don't show banner
-            }
-
-            return (
-                <div className="debug-banner">
-                    <h2>⚠️ Configuration Error Detected</h2>
-                    
-                    {hasDummyUrl && (
-                        <div>
-                            <p><strong>❌ SUPABASE_URL is not updated</strong></p>
-                            <p>You still have the placeholder value:</p>
-                            <code>{SUPABASE_URL}</code>
-                            <p>Replace it with your actual Supabase URL from:</p>
-                            <code>Supabase Dashboard → Settings → API → Project URL</code>
-                        </div>
-                    )}
-                    
-                    {hasDummyKey && (
-                        <div>
-                            <p><strong>❌ SUPABASE_ANON_KEY is not updated</strong></p>
-                            <p>You still have the placeholder value:</p>
-                            <code>YOUR-ANON-KEY-HERE</code>
-                            <p>Replace it with your actual anon key from:</p>
-                            <code>Supabase Dashboard → Settings → API → Project API Keys → anon</code>
-                        </div>
-                    )}
-                    
-                    {initError && (
-                        <div>
-                            <p><strong>❌ Supabase Client Error:</strong></p>
-                            <code>{initError}</code>
-                            <p>Make sure both URL and Key are valid and properly formatted.</p>
-                        </div>
-                    )}
-                    
-                    <p style={{marginTop: '1rem', fontSize: '0.8rem'}}>
-                        <strong>Next steps:</strong>
-                        <br/>1. Open this HTML file in a text editor (VS Code, Notepad, etc.)
-                        <br/>2. Find the lines with SUPABASE_URL and SUPABASE_ANON_KEY
-                        <br/>3. Replace with actual values from your Supabase dashboard
-                        <br/>4. Save the file
-                        <br/>5. Refresh this page
-                    </p>
-                </div>
-            );
+        // Get current date in EST timezone
+        function getCurrentDate() {
+            const now = new Date();
+            const estDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            return estDate.toISOString().split('T')[0];
         }
 
         function App() {
-            // If credentials are missing, show debug banner only
+            // If credentials are missing, show error
             if (hasDummyUrl || hasDummyKey || initError) {
                 return (
                     <div className="app-container">
@@ -692,7 +630,24 @@
                             <h1 className="date-header">⚠️ Setup Required</h1>
                             <p className="tagline">Configuration Missing</p>
                         </header>
-                        <DebugBanner />
+                        <div className="section" style={{borderLeftColor: 'var(--coral)'}}>
+                            <h2 style={{color: 'var(--coral)', marginBottom: '1rem'}}>Configuration Error</h2>
+                            {hasDummyUrl && (
+                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>SUPABASE_URL</strong> not updated. Replace "YOUR-PROJECT-ID" with your actual project ID.</p>
+                            )}
+                            {hasDummyKey && (
+                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>SUPABASE_ANON_KEY</strong> not updated. Replace "YOUR-ANON-KEY-HERE" with your actual anon key.</p>
+                            )}
+                            {initError && (
+                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>Initialization Error:</strong> {initError}</p>
+                            )}
+                            <p style={{marginTop: '1rem', fontSize: '0.9rem', color: 'var(--ash)'}}>
+                                1. Open this HTML file in a text editor<br/>
+                                2. Find SUPABASE_URL and SUPABASE_ANON_KEY<br/>
+                                3. Replace with values from Supabase Dashboard → Settings → API<br/>
+                                4. Save and refresh
+                            </p>
+                        </div>
                     </div>
                 );
             }
@@ -704,12 +659,16 @@
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            const [sections, setSections] = useState([]);
 
             useEffect(() => {
                 checkUser();
                 
                 const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                     setUser(session?.user || null);
+                    if (session?.user) {
+                        loadSections();
+                    }
                 });
 
                 return () => {
@@ -721,11 +680,115 @@
                 try {
                     const { data: { session } } = await supabase.auth.getSession();
                     setUser(session?.user || null);
+                    if (session?.user) {
+                        await handleNewDay(getCurrentDate());
+                        await loadSections();
+                    }
                 } catch (err) {
                     setError('Failed to check user: ' + err.message);
                     console.error('Error checking user:', err);
                 } finally {
                     setLoading(false);
+                }
+            }
+
+            async function handleNewDay(date) {
+                try {
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    if (!currentUser) return;
+
+                    const { data: existingTasks, error: checkError } = await supabase
+                        .from('tasks')
+                        .select('id', { count: 'exact' })
+                        .eq('user_id', currentUser.id)
+                        .eq('date', date)
+                        .limit(1);
+
+                    if (checkError) {
+                        console.error('Error checking existing tasks:', checkError);
+                        return;
+                    }
+
+                    if (existingTasks && existingTasks.length > 0) {
+                        console.log('Tasks already exist for', date);
+                        return;
+                    }
+
+                    const { data: templateTasks, error: templateError } = await supabase
+                        .from('task_templates')
+                        .select('id,section_id,text,parent_task_id')
+                        .eq('user_id', currentUser.id);
+
+                    if (templateError) {
+                        console.error('Error fetching templates:', templateError);
+                        return;
+                    }
+
+                    if (!templateTasks || templateTasks.length === 0) {
+                        console.log('No templates found');
+                        return;
+                    }
+
+                    const tasksToCreate = templateTasks.map(template => ({
+                        section_id: template.section_id,
+                        user_id: currentUser.id,
+                        text: template.text,
+                        completed: false,
+                        date: date,
+                        template_id: template.id,
+                        parent_task_id: template.parent_task_id
+                    }));
+
+                    const { error: insertError } = await supabase
+                        .from('tasks')
+                        .insert(tasksToCreate);
+
+                    if (insertError) {
+                        if (insertError.code === '23505') {
+                            console.log('Tasks already created by another process');
+                        } else {
+                            console.error('Error creating tasks:', insertError);
+                        }
+                    }
+
+                } catch (err) {
+                    console.error('Unexpected error in handleNewDay:', err);
+                }
+            }
+
+            async function loadSections() {
+                try {
+                    const today = getCurrentDate();
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+                    const { data: sectionsData, error: sectionsError } = await supabase
+                        .from('sections')
+                        .select('id,user_id,name,order_index')
+                        .eq('user_id', currentUser.id)
+                        .order('order_index', { ascending: true });
+
+                    if (sectionsError) {
+                        setError(sectionsError.message);
+                        return;
+                    }
+
+                    const { data: tasksData } = await supabase
+                        .from('tasks')
+                        .select('id,section_id,user_id,text,completed,date,template_id,parent_task_id')
+                        .eq('user_id', currentUser.id)
+                        .eq('date', today)
+                        .order('created_at', { ascending: true });
+
+                    const sectionsWithTasks = sectionsData.map(section => ({
+                        ...section,
+                        tasks: tasksData?.filter(t => t.section_id === section.id) || []
+                    }));
+
+                    setSections(sectionsWithTasks);
+                    
+                } catch (err) {
+                    setError('Failed to load sections: ' + err.message);
+                    console.error('Error loading sections:', err);
                 }
             }
 
@@ -741,7 +804,7 @@
                 return <AuthScreen setError={setError} />;
             }
 
-            return <TaskApp user={user} setError={setError} />;
+            return <TaskApp user={user} sections={sections} setSections={setSections} setError={setError} loadSections={loadSections} />;
         }
 
         function AuthScreen({ setError }) {
@@ -763,7 +826,6 @@
                     } else {
                         const { error: signUpError } = await supabase.auth.signUp({ email, password });
                         if (signUpError) throw signUpError;
-                        setLocalError(null);
                         alert('✅ Check your email to confirm your account!');
                     }
                 } catch (error) {
@@ -821,8 +883,7 @@
             );
         }
 
-        function TaskApp({ user, setError }) {
-            const [sections, setSections] = useState([]);
+        function TaskApp({ user, sections, setSections, setError, loadSections }) {
             const [showNewSection, setShowNewSection] = useState(false);
             const [newSectionName, setNewSectionName] = useState('');
 
@@ -833,26 +894,6 @@
                 day: 'numeric',
                 timeZone: 'America/New_York'
             });
-
-            useEffect(() => {
-                loadSections();
-            }, []);
-
-            async function loadSections() {
-                try {
-                    const { data, error } = await supabase
-                        .from('sections')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .order('order_index', { ascending: true });
-
-                    if (error) throw error;
-                    setSections(data || []);
-                } catch (err) {
-                    setError('Failed to load sections: ' + err.message);
-                    console.error('Error loading sections:', err);
-                }
-            }
 
             async function addSection(e) {
                 e.preventDefault();
@@ -870,11 +911,29 @@
 
                     if (error) throw error;
 
-                    setSections([...sections, data[0]]);
+                    setSections([...sections, { ...data[0], tasks: [] }]);
                     setNewSectionName('');
                     setShowNewSection(false);
                 } catch (err) {
                     setError('Failed to create section: ' + err.message);
+                    console.error('Error adding section:', err);
+                }
+            }
+
+            async function deleteSection(sectionId) {
+                if (!confirm('Delete this section and all its tasks?')) return;
+
+                try {
+                    const { error } = await supabase
+                        .from('sections')
+                        .delete()
+                        .eq('id', sectionId);
+
+                    if (error) throw error;
+
+                    setSections(sections.filter(s => s.id !== sectionId));
+                } catch (err) {
+                    setError('Failed to delete section: ' + err.message);
                 }
             }
 
@@ -889,6 +948,13 @@
                         <div className="control-group">
                             <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>
                                 + New Section
+                            </button>
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={loadSections}
+                                title="Refresh data"
+                            >
+                                🔄 Refresh
                             </button>
                         </div>
                         <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
@@ -927,7 +993,7 @@
                     {sections.length === 0 ? (
                         <div className="section">
                             <p style={{color: 'var(--ash)'}}>
-                                👋 Welcome! Click "+ New Section" to get started.
+                                👋 Welcome! Click "+ New Section" to get started. Your data is secure and private.
                             </p>
                         </div>
                     ) : (
@@ -937,16 +1003,204 @@
                                 className="section"
                                 style={{animationDelay: `${index * 0.1}s`}}
                             >
-                                <div className="section-header">
-                                    <h2 className="section-title">{section.name}</h2>
-                                </div>
-                                <p style={{color: 'var(--ash)', fontSize: '0.875rem'}}>
-                                    (Full task features coming in next update)
-                                </p>
+                                <SectionComponent
+                                    user={user}
+                                    section={section}
+                                    setSections={setSections}
+                                    sections={sections}
+                                    deleteSection={deleteSection}
+                                    setError={setError}
+                                />
                             </div>
                         ))
                     )}
                 </div>
+            );
+        }
+
+        function SectionComponent({ user, section, setSections, sections, deleteSection, setError }) {
+            const [tasks, setTasks] = useState(section.tasks || []);
+            const [newTaskText, setNewTaskText] = useState('');
+            const [taskType, setTaskType] = useState('daily');
+
+            useEffect(() => {
+                setTasks(section.tasks || []);
+            }, [section.tasks]);
+
+            const today = getCurrentDate();
+
+            async function addTask(e) {
+                e.preventDefault();
+                if (!newTaskText.trim()) return;
+
+                try {
+                    if (taskType === 'daily') {
+                        // Create template
+                        const { data: templateData, error: templateError } = await supabase
+                            .from('task_templates')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: newTaskText,
+                                parent_task_id: null
+                            }])
+                            .select('id');
+
+                        if (templateError) throw templateError;
+
+                        // Create today's instance
+                        const { data, error } = await supabase
+                            .from('tasks')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: newTaskText,
+                                completed: false,
+                                date: today,
+                                template_id: templateData[0].id,
+                                parent_task_id: null
+                            }])
+                            .select();
+
+                        if (error) throw error;
+                        
+                        setTasks([...tasks, data[0]]);
+                    } else {
+                        // One-time task
+                        const { data, error } = await supabase
+                            .from('tasks')
+                            .insert([{
+                                section_id: section.id,
+                                user_id: user.id,
+                                text: newTaskText,
+                                completed: false,
+                                date: today,
+                                template_id: null,
+                                parent_task_id: null
+                            }])
+                            .select();
+
+                        if (error) throw error;
+                        
+                        setTasks([...tasks, data[0]]);
+                    }
+
+                    setNewTaskText('');
+                } catch (err) {
+                    setError('Failed to add task: ' + err.message);
+                    console.error('Error adding task:', err);
+                }
+            }
+
+            async function toggleTask(taskId, completed) {
+                try {
+                    const { error } = await supabase
+                        .from('tasks')
+                        .update({ completed })
+                        .eq('id', taskId);
+
+                    if (error) throw error;
+                    
+                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
+                } catch (err) {
+                    setError('Failed to update task: ' + err.message);
+                }
+            }
+
+            async function deleteTask(taskId) {
+                const task = tasks.find(t => t.id === taskId);
+                
+                try {
+                    const { error } = await supabase
+                        .from('tasks')
+                        .delete()
+                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+
+                    if (error) throw error;
+
+                    if (task?.template_id) {
+                        await supabase
+                            .from('task_templates')
+                            .delete()
+                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
+                    }
+
+                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
+                } catch (err) {
+                    setError('Failed to delete task: ' + err.message);
+                }
+            }
+
+            return (
+                <>
+                    <div className="section-header">
+                        <h2 className="section-title">{section.name}</h2>
+                        <div>
+                            <button 
+                                className="icon-btn"
+                                onClick={() => deleteSection(section.id)}
+                                title="Delete section"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+
+                    <ul className="task-list">
+                        {tasks.filter(t => !t.parent_task_id).map(task => (
+                            <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    className="checkbox"
+                                    checked={task.completed}
+                                    onChange={(e) => toggleTask(task.id, e.target.checked)}
+                                />
+                                <div className="task-content">
+                                    <span className="task-text">{task.text}</span>
+                                </div>
+                                <div className="task-meta">
+                                    <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
+                                        {task.template_id ? 'Daily' : 'One-Time'}
+                                    </span>
+                                    <button 
+                                        className="icon-btn"
+                                        onClick={() => deleteTask(task.id)}
+                                        title="Delete task"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <form className="add-task-form" onSubmit={addTask}>
+                        <input
+                            type="text"
+                            className="task-input"
+                            value={newTaskText}
+                            onChange={(e) => setNewTaskText(e.target.value)}
+                            placeholder="Add new task..."
+                        />
+                        <div className="type-toggle">
+                            <button
+                                type="button"
+                                className={`type-option ${taskType === 'daily' ? 'active' : ''}`}
+                                onClick={() => setTaskType('daily')}
+                            >
+                                Daily
+                            </button>
+                            <button
+                                type="button"
+                                className={`type-option ${taskType === 'one-time' ? 'active' : ''}`}
+                                onClick={() => setTaskType('one-time')}
+                            >
+                                One-Time
+                            </button>
+                        </div>
+                        <button type="submit" className="btn">Add</button>
+                    </form>
+                </>
             );
         }
 
