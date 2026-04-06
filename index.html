@@ -60,12 +60,52 @@
             z-index: 1;
         }
 
+        #root {
+            position: relative;
+            z-index: 2;
+        }
+
         .app-container {
             position: relative;
             z-index: 2;
             max-width: 1000px;
             margin: 0 auto;
             padding: 3rem 2rem;
+        }
+
+        .debug-banner {
+            background: rgba(255, 107, 107, 0.15);
+            border: 2px solid var(--coral);
+            color: var(--coral);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .debug-banner h2 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .debug-banner code {
+            display: block;
+            background: var(--charcoal);
+            padding: 1rem;
+            margin: 0.75rem 0;
+            border-left: 2px solid var(--coral);
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .debug-banner p {
+            margin-bottom: 0.5rem;
+        }
+
+        .debug-banner a {
+            color: var(--cyan);
+            text-decoration: underline;
         }
 
         .masthead {
@@ -97,35 +137,6 @@
             background-clip: text;
             margin-bottom: 0.5rem;
             animation: glow 3s ease-in-out infinite alternate;
-        }
-
-        .cache-indicator {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            padding: 0.75rem 1.25rem;
-            background: var(--charcoal);
-            border: 1px solid var(--cyan);
-            border-radius: 2px;
-            font-size: 0.75rem;
-            color: var(--cyan);
-            opacity: 0;
-            transition: opacity 0.3s;
-            z-index: 999;
-        }
-
-        .cache-indicator.show {
-            opacity: 1;
-        }
-
-        .cache-indicator.warning {
-            border-color: var(--coral);
-            color: var(--coral);
-        }
-
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.4)); }
-            to { filter: drop-shadow(0 0 40px rgba(0, 255, 245, 0.6)); }
         }
 
         .tagline {
@@ -204,11 +215,6 @@
             color: var(--noir);
         }
 
-        .btn-small {
-            padding: 0.5rem 1rem;
-            font-size: 0.75rem;
-        }
-
         .section {
             margin-bottom: 2.5rem;
             background: var(--charcoal);
@@ -216,10 +222,6 @@
             padding: 2rem;
             position: relative;
             animation: slideIn 0.5s ease-out backwards;
-        }
-
-        .section.dragging {
-            opacity: 0.5;
         }
 
         @keyframes slideIn {
@@ -248,15 +250,6 @@
             text-transform: uppercase;
             letter-spacing: 0.02em;
             color: var(--lime);
-        }
-
-        .section.stories .section-title {
-            color: var(--gold);
-        }
-
-        .section-actions {
-            display: flex;
-            gap: 0.5rem;
         }
 
         .icon-btn {
@@ -545,62 +538,6 @@
             box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
         }
 
-        .archive {
-            margin-bottom: 2.5rem;
-            background: var(--charcoal);
-            border-left: 4px solid var(--cyan);
-            padding: 2rem;
-        }
-
-        .archive-dates {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .date-btn {
-            padding: 0.5rem 1rem;
-            background: var(--slate);
-            border: 1px solid var(--ash);
-            color: var(--ash);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .date-btn:hover {
-            border-color: var(--cyan);
-            color: var(--cyan);
-        }
-
-        .date-btn.active {
-            background: var(--cyan);
-            color: var(--noir);
-            border-color: var(--cyan);
-        }
-
-        .archive-day-title {
-            color: var(--cyan);
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 1.25rem;
-            margin-bottom: 1.5rem;
-            text-transform: uppercase;
-        }
-
-        .archive-section {
-            margin-bottom: 1.5rem;
-        }
-
-        .archive-section-title {
-            color: var(--lime);
-            font-weight: 600;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            margin-bottom: 0.75rem;
-        }
-
         .message {
             padding: 1rem 1.5rem;
             margin-bottom: 1.5rem;
@@ -626,6 +563,11 @@
             padding: 4rem 2rem;
             font-size: 1.25rem;
             color: var(--ash);
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.4)); }
+            to { filter: drop-shadow(0 0 40px rgba(0, 255, 245, 0.6)); }
         }
 
         @media (max-width: 768px) {
@@ -664,138 +606,110 @@
 </head>
 <body>
     <div id="root"></div>
-    <div id="cache-indicator" class="cache-indicator"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
         
         // ⚠️ REPLACE THESE WITH YOUR NEW SUPABASE CREDENTIALS
-        // Follow the guide: https://docs.google.com/document/... (or wherever you saved it)
-        const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
-        const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY-HERE';
+        const SUPABASE_URL = 'https://dgxtslpwsayucznkrqih.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRneHRzbHB3c2F5dWN6bmtycWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NzYxMTcsImV4cCI6MjA5MTA1MjExN30.sLiEngc7B5es_jMh_u8eaJNirUScg3cGqhO9_Ku8x-I';
         
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // DEBUG: Check for dummy values
+        const hasDummyUrl = SUPABASE_URL.includes('YOUR-PROJECT-ID');
+        const hasDummyKey = SUPABASE_ANON_KEY.includes('YOUR-ANON-KEY');
+        
+        console.log('🚀 App initializing...');
+        console.log('Supabase URL valid?', !hasDummyUrl);
+        console.log('Supabase Key valid?', !hasDummyKey);
+        console.log('window.supabase exists?', !!window.supabase);
 
-        // ========================================
-        // CACHE MANAGER - Reduces Supabase egress by 70-80%
-        // ========================================
-        const CacheManager = {
-            CACHE_DURATION_TASKS: 5 * 60 * 1000, // 5 minutes for today's tasks
-            CACHE_DURATION_ARCHIVE: 60 * 60 * 1000, // 1 hour for archive (rarely changes)
-            
-            get(key) {
-                try {
-                    const cached = localStorage.getItem(`cache_${key}`);
-                    const timestamp = localStorage.getItem(`cache_${key}_time`);
-                    
-                    if (!cached || !timestamp) return null;
-                    
-                    const duration = key.includes('archive') 
-                        ? this.CACHE_DURATION_ARCHIVE 
-                        : this.CACHE_DURATION_TASKS;
-                    
-                    const age = Date.now() - parseInt(timestamp);
-                    if (age > duration) {
-                        this.delete(key);
-                        return null;
-                    }
-                    
-                    this.showIndicator('📦 Using cached data');
-                    return JSON.parse(cached);
-                } catch (e) {
-                    console.error('Cache get error:', e);
-                    return null;
-                }
-            },
-            
-            set(key, data) {
-                try {
-                    localStorage.setItem(`cache_${key}`, JSON.stringify(data));
-                    localStorage.setItem(`cache_${key}_time`, Date.now().toString());
-                } catch (e) {
-                    console.error('Cache set error:', e);
-                    if (e.name === 'QuotaExceededError') {
-                        this.showIndicator('⚠️ Cache storage full, clearing old entries', true);
-                        this.clearOldest();
-                    }
-                }
-            },
-            
-            delete(key) {
-                try {
-                    localStorage.removeItem(`cache_${key}`);
-                    localStorage.removeItem(`cache_${key}_time`);
-                } catch (e) {
-                    console.error('Cache delete error:', e);
-                }
-            },
-            
-            clearOldest() {
-                try {
-                    const keys = Object.keys(localStorage)
-                        .filter(k => k.startsWith('cache_') && k.endsWith('_time'))
-                        .sort((a, b) => 
-                            parseInt(localStorage.getItem(a)) - parseInt(localStorage.getItem(b))
-                        );
-                    
-                    // Delete oldest 10 entries
-                    for (let i = 0; i < Math.min(10, keys.length); i++) {
-                        const timeKey = keys[i];
-                        const dataKey = timeKey.replace('_time', '');
-                        localStorage.removeItem(dataKey);
-                        localStorage.removeItem(timeKey);
-                    }
-                } catch (e) {
-                    console.error('Cache clearOldest error:', e);
-                }
-            },
-            
-            invalidate(pattern) {
-                try {
-                    Object.keys(localStorage).forEach(key => {
-                        if (key.startsWith('cache_') && key.includes(pattern) && !key.endsWith('_time')) {
-                            this.delete(key.replace('cache_', ''));
-                        }
-                    });
-                } catch (e) {
-                    console.error('Cache invalidate error:', e);
-                }
-            },
-            
-            showIndicator(message, warning = false) {
-                const indicator = document.getElementById('cache-indicator');
-                if (indicator) {
-                    indicator.textContent = message;
-                    indicator.classList.toggle('warning', warning);
-                    indicator.classList.add('show');
-                    setTimeout(() => indicator.classList.remove('show'), 2500);
-                }
+        let supabase;
+        let initError = null;
+
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log('✅ Supabase client created');
+        } catch (err) {
+            initError = err.message;
+            console.error('❌ Failed to create Supabase client:', err);
+        }
+
+        function DebugBanner() {
+            if (!initError && !hasDummyUrl && !hasDummyKey) {
+                return null; // No errors, don't show banner
             }
-        };
 
-        // Get current date in EST timezone
-        function getCurrentDate() {
-            const now = new Date();
-            const estDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-            return estDate.toISOString().split('T')[0];
+            return (
+                <div className="debug-banner">
+                    <h2>⚠️ Configuration Error Detected</h2>
+                    
+                    {hasDummyUrl && (
+                        <div>
+                            <p><strong>❌ SUPABASE_URL is not updated</strong></p>
+                            <p>You still have the placeholder value:</p>
+                            <code>{SUPABASE_URL}</code>
+                            <p>Replace it with your actual Supabase URL from:</p>
+                            <code>Supabase Dashboard → Settings → API → Project URL</code>
+                        </div>
+                    )}
+                    
+                    {hasDummyKey && (
+                        <div>
+                            <p><strong>❌ SUPABASE_ANON_KEY is not updated</strong></p>
+                            <p>You still have the placeholder value:</p>
+                            <code>YOUR-ANON-KEY-HERE</code>
+                            <p>Replace it with your actual anon key from:</p>
+                            <code>Supabase Dashboard → Settings → API → Project API Keys → anon</code>
+                        </div>
+                    )}
+                    
+                    {initError && (
+                        <div>
+                            <p><strong>❌ Supabase Client Error:</strong></p>
+                            <code>{initError}</code>
+                            <p>Make sure both URL and Key are valid and properly formatted.</p>
+                        </div>
+                    )}
+                    
+                    <p style={{marginTop: '1rem', fontSize: '0.8rem'}}>
+                        <strong>Next steps:</strong>
+                        <br/>1. Open this HTML file in a text editor (VS Code, Notepad, etc.)
+                        <br/>2. Find the lines with SUPABASE_URL and SUPABASE_ANON_KEY
+                        <br/>3. Replace with actual values from your Supabase dashboard
+                        <br/>4. Save the file
+                        <br/>5. Refresh this page
+                    </p>
+                </div>
+            );
         }
 
         function App() {
+            // If credentials are missing, show debug banner only
+            if (hasDummyUrl || hasDummyKey || initError) {
+                return (
+                    <div className="app-container">
+                        <header className="masthead">
+                            <h1 className="date-header">⚠️ Setup Required</h1>
+                            <p className="tagline">Configuration Missing</p>
+                        </header>
+                        <DebugBanner />
+                    </div>
+                );
+            }
+
+            return <MainApp />;
+        }
+
+        function MainApp() {
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
-            const [sections, setSections] = useState([]);
             const [error, setError] = useState(null);
-            const [success, setSuccess] = useState(null);
-            const [showArchive, setShowArchive] = useState(false);
 
             useEffect(() => {
                 checkUser();
                 
                 const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                     setUser(session?.user || null);
-                    if (session?.user) {
-                        loadSections();
-                    }
                 });
 
                 return () => {
@@ -807,237 +721,108 @@
                 try {
                     const { data: { session } } = await supabase.auth.getSession();
                     setUser(session?.user || null);
-                    if (session?.user) {
-                        await handleNewDay(getCurrentDate());
-                        await loadSections();
-                    }
                 } catch (err) {
+                    setError('Failed to check user: ' + err.message);
                     console.error('Error checking user:', err);
-                    setError('Failed to load user session');
                 } finally {
                     setLoading(false);
-                }
-            }
-
-            async function handleNewDay(date) {
-                try {
-                    const { data: { user: currentUser } } = await supabase.auth.getUser();
-                    if (!currentUser) return;
-
-                    // Check if we already have tasks for this date
-                    const { data: existingTasks, error: checkError } = await supabase
-                        .from('tasks')
-                        .select('id', { count: 'exact' })
-                        .eq('user_id', currentUser.id)
-                        .eq('date', date)
-                        .limit(1);
-
-                    if (checkError) {
-                        console.error('Error checking existing tasks:', checkError);
-                        return;
-                    }
-
-                    if (existingTasks && existingTasks.length > 0) {
-                        console.log('Tasks already exist for', date);
-                        return;
-                    }
-
-                    // Get template tasks (only columns we need)
-                    const { data: templateTasks, error: templateError } = await supabase
-                        .from('task_templates')
-                        .select('id,section_id,text,parent_task_id')
-                        .eq('user_id', currentUser.id);
-
-                    if (templateError) {
-                        console.error('Error fetching templates:', templateError);
-                        return;
-                    }
-
-                    if (!templateTasks || templateTasks.length === 0) {
-                        console.log('No templates found');
-                        return;
-                    }
-
-                    // Create today's tasks from templates
-                    const tasksToCreate = templateTasks.map(template => ({
-                        section_id: template.section_id,
-                        user_id: currentUser.id,
-                        text: template.text,
-                        completed: false,
-                        date: date,
-                        template_id: template.id,
-                        parent_task_id: template.parent_task_id
-                    }));
-
-                    const { error: insertError } = await supabase
-                        .from('tasks')
-                        .insert(tasksToCreate);
-
-                    if (insertError) {
-                        if (insertError.code === '23505') {
-                            console.log('Tasks already created by another process');
-                        } else {
-                            console.error('Error creating tasks:', insertError);
-                        }
-                    } else {
-                        console.log(`Created ${tasksToCreate.length} tasks for ${date}`);
-                    }
-
-                } catch (err) {
-                    console.error('Unexpected error in handleNewDay:', err);
-                }
-            }
-
-            async function loadSections() {
-                try {
-                    const today = getCurrentDate();
-                    const { data: { user: currentUser } } = await supabase.auth.getUser();
-                    
-                    const cacheKey = `sections_${currentUser.id}`;
-                    const cached = CacheManager.get(cacheKey);
-                    
-                    if (cached) {
-                        setSections(cached);
-                        return;
-                    }
-
-                    // Load sections (only needed columns)
-                    const { data: sectionsData, error: sectionsError } = await supabase
-                        .from('sections')
-                        .select('id,user_id,name,order_index')
-                        .eq('user_id', currentUser.id)
-                        .order('order_index', { ascending: true });
-
-                    if (sectionsError) {
-                        setError(sectionsError.message);
-                        return;
-                    }
-
-                    // Load tasks for today only
-                    const { data: tasksData, error: tasksError } = await supabase
-                        .from('tasks')
-                        .select('id,section_id,user_id,text,completed,date,template_id,parent_task_id')
-                        .eq('user_id', currentUser.id)
-                        .eq('date', today)
-                        .order('created_at', { ascending: true });
-
-                    if (tasksError) {
-                        setError(tasksError.message);
-                        return;
-                    }
-
-                    const sectionsWithTasks = sectionsData.map(section => ({
-                        ...section,
-                        tasks: tasksData?.filter(t => t.section_id === section.id) || []
-                    }));
-
-                    setSections(sectionsWithTasks);
-                    CacheManager.set(cacheKey, sectionsWithTasks);
-                    
-                } catch (err) {
-                    console.error('Error loading sections:', err);
-                    setError('Failed to load sections');
                 }
             }
 
             if (loading) {
-                return <div className="loading">⏳ Loading System...</div>;
+                return (
+                    <div className="app-container">
+                        <div className="loading">⏳ Loading System...</div>
+                    </div>
+                );
             }
 
             if (!user) {
-                return <AuthScreen />;
+                return <AuthScreen setError={setError} />;
             }
 
-            return (
-                <MainApp 
-                    user={user}
-                    sections={sections}
-                    setSections={setSections}
-                    loadSections={loadSections}
-                    error={error}
-                    setError={setError}
-                    success={success}
-                    setSuccess={setSuccess}
-                    showArchive={showArchive}
-                    setShowArchive={setShowArchive}
-                />
-            );
+            return <TaskApp user={user} setError={setError} />;
         }
 
-        function AuthScreen() {
+        function AuthScreen({ setError }) {
             const [isLogin, setIsLogin] = useState(true);
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
-            const [error, setError] = useState(null);
+            const [error, setLocalError] = useState(null);
             const [loading, setLoading] = useState(false);
 
             async function handleAuth(e) {
                 e.preventDefault();
-                setError(null);
+                setLocalError(null);
                 setLoading(true);
 
                 try {
                     if (isLogin) {
-                        const { error } = await supabase.auth.signInWithPassword({ email, password });
-                        if (error) throw error;
+                        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+                        if (signInError) throw signInError;
                     } else {
-                        const { error } = await supabase.auth.signUp({ email, password });
-                        if (error) throw error;
-                        setError(null);
+                        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+                        if (signUpError) throw signUpError;
+                        setLocalError(null);
                         alert('✅ Check your email to confirm your account!');
                     }
                 } catch (error) {
+                    setLocalError(error.message);
                     setError(error.message);
+                    console.error('Auth error:', error);
                 } finally {
                     setLoading(false);
                 }
             }
 
             return (
-                <div className="auth-screen">
-                    <h1 className="auth-title">{isLogin ? 'Login' : 'Sign Up'}</h1>
-                    {error && <div className="message message-error">❌ {error}</div>}
-                    <form onSubmit={handleAuth}>
-                        <div className="input-group">
-                            <label className="input-label">Email</label>
-                            <input
-                                type="email"
-                                className="input-field"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
+                <div className="app-container">
+                    <div className="auth-screen">
+                        <h1 className="auth-title">{isLogin ? 'Login' : 'Sign Up'}</h1>
+                        {error && <div className="message message-error">❌ {error}</div>}
+                        <form onSubmit={handleAuth}>
+                            <div className="input-group">
+                                <label className="input-label">Email</label>
+                                <input
+                                    type="email"
+                                    className="input-field"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Password</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
+                            <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}} disabled={loading}>
+                                {loading ? '⏳ ' : ''}{isLogin ? 'Login' : 'Sign Up'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{width: '100%'}}
+                                onClick={() => setIsLogin(!isLogin)}
                                 disabled={loading}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="input-label">Password</label>
-                            <input
-                                type="password"
-                                className="input-field"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                disabled={loading}
-                            />
-                        </div>
-                        <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}} disabled={loading}>
-                            {loading ? '⏳ ' : ''}{isLogin ? 'Login' : 'Sign Up'}
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{width: '100%'}}
-                            onClick={() => setIsLogin(!isLogin)}
-                            disabled={loading}
-                        >
-                            {isLogin ? 'Need an account?' : 'Have an account?'}
-                        </button>
-                    </form>
+                            >
+                                {isLogin ? 'Need an account?' : 'Have an account?'}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             );
         }
 
-        function MainApp({ user, sections, setSections, loadSections, error, setError, success, setSuccess, showArchive, setShowArchive }) {
+        function TaskApp({ user, setError }) {
+            const [sections, setSections] = useState([]);
             const [showNewSection, setShowNewSection] = useState(false);
             const [newSectionName, setNewSectionName] = useState('');
 
@@ -1048,6 +833,26 @@
                 day: 'numeric',
                 timeZone: 'America/New_York'
             });
+
+            useEffect(() => {
+                loadSections();
+            }, []);
+
+            async function loadSections() {
+                try {
+                    const { data, error } = await supabase
+                        .from('sections')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .order('order_index', { ascending: true });
+
+                    if (error) throw error;
+                    setSections(data || []);
+                } catch (err) {
+                    setError('Failed to load sections: ' + err.message);
+                    console.error('Error loading sections:', err);
+                }
+            }
 
             async function addSection(e) {
                 e.preventDefault();
@@ -1065,32 +870,11 @@
 
                     if (error) throw error;
 
-                    setSections([...sections, { ...data[0], tasks: [] }]);
-                    CacheManager.invalidate('sections');
+                    setSections([...sections, data[0]]);
                     setNewSectionName('');
                     setShowNewSection(false);
-                    setSuccess('✓ Section created');
                 } catch (err) {
-                    setError(err.message);
-                }
-            }
-
-            async function deleteSection(sectionId) {
-                if (!confirm('Delete this section and all its tasks?')) return;
-
-                try {
-                    const { error } = await supabase
-                        .from('sections')
-                        .delete()
-                        .eq('id', sectionId);
-
-                    if (error) throw error;
-
-                    setSections(sections.filter(s => s.id !== sectionId));
-                    CacheManager.invalidate('sections');
-                    setSuccess('✓ Section deleted');
-                } catch (err) {
-                    setError(err.message);
+                    setError('Failed to create section: ' + err.message);
                 }
             }
 
@@ -1106,27 +890,11 @@
                             <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>
                                 + New Section
                             </button>
-                            <button 
-                                className={showArchive ? "btn" : "btn btn-secondary"}
-                                onClick={() => setShowArchive(!showArchive)}
-                            >
-                                {showArchive ? 'Hide Archive' : 'View Archive'}
-                            </button>
-                            <button 
-                                className="btn btn-secondary"
-                                onClick={loadSections}
-                                title="Manually refresh data"
-                            >
-                                🔄 Refresh
-                            </button>
                         </div>
                         <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
                             Sign Out
                         </button>
                     </div>
-
-                    {error && <div className="message message-error">❌ {error}</div>}
-                    {success && <div className="message message-success">✓ {success}</div>}
 
                     {showNewSection && (
                         <div className="section" style={{marginBottom: '2.5rem'}}>
@@ -1156,546 +924,27 @@
                         </div>
                     )}
 
-                    {showArchive && <Archive user={user} />}
-
-                    {sections.map((section, index) => (
-                        <div 
-                            key={section.id} 
-                            className="section"
-                            style={{animationDelay: `${index * 0.1}s`}}
-                        >
-                            <Section
-                                user={user}
-                                section={section}
-                                setSections={setSections}
-                                deleteSection={deleteSection}
-                                setError={setError}
-                                setSuccess={setSuccess}
-                            />
+                    {sections.length === 0 ? (
+                        <div className="section">
+                            <p style={{color: 'var(--ash)'}}>
+                                👋 Welcome! Click "+ New Section" to get started.
+                            </p>
                         </div>
-                    ))}
-
-                    <StoriesSection user={user} setError={setError} setSuccess={setSuccess} />
-                </div>
-            );
-        }
-
-        function Section({ user, section, setSections, deleteSection, setError, setSuccess }) {
-            const [tasks, setTasks] = useState(section.tasks || []);
-            const [newTaskText, setNewTaskText] = useState('');
-            const [taskType, setTaskType] = useState('daily');
-
-            useEffect(() => {
-                setTasks(section.tasks || []);
-            }, [section.tasks]);
-
-            async function addTask(e) {
-                e.preventDefault();
-                if (!newTaskText.trim()) return;
-
-                const today = getCurrentDate();
-
-                try {
-                    if (taskType === 'daily') {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                parent_task_id: null
-                            }])
-                            .select('id');
-
-                        if (templateError) throw templateError;
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) throw error;
-                        
-                        setTasks([...tasks, data[0]]);
-                        CacheManager.invalidate('sections');
-                    } else {
-                        // One-time task
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) throw error;
-                        
-                        setTasks([...tasks, data[0]]);
-                        CacheManager.invalidate('sections');
-                    }
-
-                    setNewTaskText('');
-                    setSuccess('✓ Task added');
-                } catch (err) {
-                    setError(err.message);
-                }
-            }
-
-            async function toggleTask(taskId, completed) {
-                try {
-                    const { error } = await supabase
-                        .from('tasks')
-                        .update({ completed })
-                        .eq('id', taskId);
-
-                    if (error) throw error;
-                    
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
-                } catch (err) {
-                    setError(err.message);
-                }
-            }
-
-            async function deleteTask(taskId) {
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    // Delete the task and its subtasks
-                    const { error } = await supabase
-                        .from('tasks')
-                        .delete()
-                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
-
-                    if (error) throw error;
-
-                    // If it has a template, delete the template too
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .delete()
-                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
-                    }
-
-                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
-                    CacheManager.invalidate('sections');
-                    setSuccess('✓ Task deleted');
-                } catch (err) {
-                    setError(err.message);
-                }
-            }
-
-            return (
-                <>
-                    <div className="section-header">
-                        <h2 className="section-title">{section.name}</h2>
-                        <div className="section-actions">
-                            <button 
-                                className="icon-btn"
-                                onClick={() => deleteSection(section.id)}
-                                title="Delete section"
+                    ) : (
+                        sections.map((section, index) => (
+                            <div 
+                                key={section.id} 
+                                className="section"
+                                style={{animationDelay: `${index * 0.1}s`}}
                             >
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-
-                    <ul className="task-list">
-                        {tasks.filter(t => !t.parent_task_id).map(task => (
-                            <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
-                                <input
-                                    type="checkbox"
-                                    className="checkbox"
-                                    checked={task.completed}
-                                    onChange={(e) => toggleTask(task.id, e.target.checked)}
-                                />
-                                <div className="task-content">
-                                    <span className="task-text">{task.text}</span>
-                                    {tasks.filter(t => t.parent_task_id === task.id).length > 0 && (
-                                        <div style={{marginTop: '0.75rem', marginLeft: '2rem', paddingLeft: '1rem', borderLeft: '1px solid var(--slate)'}}>
-                                            {tasks.filter(t => t.parent_task_id === task.id).map(subtask => (
-                                                <div key={subtask.id} style={{marginBottom: '0.5rem'}}>
-                                                    <input
-                                                        type="checkbox"
-                                                        className="checkbox"
-                                                        checked={subtask.completed}
-                                                        onChange={(e) => toggleTask(subtask.id, e.target.checked)}
-                                                        style={{marginRight: '0.5rem'}}
-                                                    />
-                                                    <span className={`task-text ${subtask.completed ? 'completed' : ''}`} style={{marginLeft: '0.5rem'}}>
-                                                        {subtask.text}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                <div className="section-header">
+                                    <h2 className="section-title">{section.name}</h2>
                                 </div>
-                                <div className="task-meta">
-                                    <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
-                                        {task.template_id ? 'Daily' : 'One-Time'}
-                                    </span>
-                                    <button 
-                                        className="icon-btn"
-                                        onClick={() => deleteTask(task.id)}
-                                        title="Delete task"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <form className="add-task-form" onSubmit={addTask}>
-                        <input
-                            type="text"
-                            className="task-input"
-                            value={newTaskText}
-                            onChange={(e) => setNewTaskText(e.target.value)}
-                            placeholder="Add new task..."
-                        />
-                        <div className="type-toggle">
-                            <button
-                                type="button"
-                                className={`type-option ${taskType === 'daily' ? 'active' : ''}`}
-                                onClick={() => setTaskType('daily')}
-                            >
-                                Daily
-                            </button>
-                            <button
-                                type="button"
-                                className={`type-option ${taskType === 'one-time' ? 'active' : ''}`}
-                                onClick={() => setTaskType('one-time')}
-                            >
-                                One-Time
-                            </button>
-                        </div>
-                        <button type="submit" className="btn">Add</button>
-                    </form>
-                </>
-            );
-        }
-
-        function StoriesSection({ user, setError, setSuccess }) {
-            const [stories, setStories] = useState({
-                different: '',
-                tension: '',
-                detail: ''
-            });
-            const [isSaving, setIsSaving] = useState(false);
-
-            useEffect(() => {
-                loadStories();
-            }, []);
-
-            async function loadStories() {
-                try {
-                    const today = getCurrentDate();
-
-                    const { data, error } = await supabase
-                        .from('stories')
-                        .select('different,tension,detail')
-                        .eq('user_id', user.id)
-                        .eq('date', today)
-                        .single();
-
-                    if (data) {
-                        setStories({
-                            different: data.different || '',
-                            tension: data.tension || '',
-                            detail: data.detail || ''
-                        });
-                    }
-                } catch (err) {
-                    console.log('No stories found for today (first time?)');
-                }
-            }
-
-            async function saveStories() {
-                try {
-                    setIsSaving(true);
-                    const today = getCurrentDate();
-
-                    const { error } = await supabase
-                        .from('stories')
-                        .upsert({
-                            user_id: user.id,
-                            date: today,
-                            different: stories.different,
-                            tension: stories.tension,
-                            detail: stories.detail
-                        }, {
-                            onConflict: 'user_id,date'
-                        });
-
-                    if (error) throw error;
-                    
-                    setSuccess('✓ Stories saved');
-                    CacheManager.invalidate('stories');
-                } catch (err) {
-                    setError(err.message);
-                } finally {
-                    setIsSaving(false);
-                }
-            }
-
-            return (
-                <div className="section stories">
-                    <div className="section-header">
-                        <h2 className="section-title">📖 Stories</h2>
-                    </div>
-
-                    <div className="story-field">
-                        <label className="story-label">
-                            What was different, unexpected, or slightly off today?
-                        </label>
-                        <textarea
-                            className="story-textarea"
-                            value={stories.different}
-                            onChange={(e) => setStories({ ...stories, different: e.target.value })}
-                            placeholder="Write your thoughts..."
-                        />
-                    </div>
-
-                    <div className="story-field">
-                        <label className="story-label">
-                            What moment made you feel something or had tension?
-                        </label>
-                        <textarea
-                            className="story-textarea"
-                            value={stories.tension}
-                            onChange={(e) => setStories({ ...stories, tension: e.target.value })}
-                            placeholder="Write your thoughts..."
-                        />
-                    </div>
-
-                    <div className="story-field">
-                        <label className="story-label">
-                            What's one specific detail you'll forget by tomorrow?
-                        </label>
-                        <textarea
-                            className="story-textarea"
-                            value={stories.detail}
-                            onChange={(e) => setStories({ ...stories, detail: e.target.value })}
-                            placeholder="Write your thoughts..."
-                        />
-                    </div>
-
-                    <button className="btn" onClick={saveStories} disabled={isSaving}>
-                        {isSaving ? '⏳ ' : ''}Save Stories
-                    </button>
-                </div>
-            );
-        }
-
-        function Archive({ user }) {
-            const [dates, setDates] = useState([]);
-            const [selectedDate, setSelectedDate] = useState(null);
-            const [archiveData, setArchiveData] = useState(null);
-            const [displayLimit, setDisplayLimit] = useState(5);
-            const [loading, setLoading] = useState(false);
-
-            useEffect(() => {
-                loadArchiveDates();
-            }, []);
-
-            async function loadArchiveDates() {
-                setLoading(true);
-                try {
-                    const { data: taskDates } = await supabase
-                        .from('tasks')
-                        .select('date')
-                        .eq('user_id', user.id)
-                        .order('date', { ascending: false });
-
-                    const allDates = taskDates?.map(t => t.date) || [];
-                    const uniqueDates = Array.from(new Set(allDates)).sort((a, b) => b.localeCompare(a));
-                    
-                    setDates(uniqueDates);
-                    
-                    if (uniqueDates.length > 0 && !selectedDate) {
-                        setSelectedDate(uniqueDates[0]);
-                        loadArchiveForDate(uniqueDates[0]);
-                    }
-                } catch (err) {
-                    console.error('Error loading archive dates:', err);
-                } finally {
-                    setLoading(false);
-                }
-            }
-
-            async function loadArchiveForDate(date) {
-                setSelectedDate(date);
-                setLoading(true);
-                try {
-                    const { data: tasks } = await supabase
-                        .from('tasks')
-                        .select('id,text,completed,template_id,parent_task_id,sections(name)')
-                        .eq('user_id', user.id)
-                        .eq('date', date);
-
-                    const { data: stories } = await supabase
-                        .from('stories')
-                        .select('different,tension,detail')
-                        .eq('user_id', user.id)
-                        .eq('date', date)
-                        .single();
-
-                    const tasksBySection = {};
-                    tasks?.forEach(task => {
-                        const sectionName = task.sections?.name || 'Unknown';
-                        if (!tasksBySection[sectionName]) {
-                            tasksBySection[sectionName] = [];
-                        }
-                        tasksBySection[sectionName].push(task);
-                    });
-
-                    setArchiveData({ tasks: tasksBySection, stories });
-                } catch (err) {
-                    console.error('Error loading archive:', err);
-                } finally {
-                    setLoading(false);
-                }
-            }
-
-            const displayedDates = dates.slice(0, displayLimit);
-
-            return (
-                <div className="archive">
-                    <div className="section-header">
-                        <h2 className="section-title">📚 Archive</h2>
-                    </div>
-
-                    <div className="archive-dates">
-                        {displayedDates.map(date => (
-                            <button
-                                key={date}
-                                className={`date-btn ${selectedDate === date ? 'active' : ''}`}
-                                onClick={() => loadArchiveForDate(date)}
-                            >
-                                {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric'
-                                })}
-                            </button>
-                        ))}
-                        {displayedDates.length < dates.length && (
-                            <button
-                                className="date-btn"
-                                onClick={() => setDisplayLimit(displayLimit + 5)}
-                            >
-                                More...
-                            </button>
-                        )}
-                    </div>
-
-                    {loading && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--ash)'}}>⏳ Loading...</div>}
-
-                    {archiveData && selectedDate && !loading && (
-                        <div>
-                            <h3 className="archive-day-title">
-                                {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
-                                    weekday: 'long',
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                })}
-                            </h3>
-
-                            {Object.keys(archiveData.tasks).length > 0 && (
-                                <div>
-                                    {Object.entries(archiveData.tasks).map(([sectionName, sectionTasks]) => {
-                                        const parentTasks = sectionTasks.filter(t => !t.parent_task_id);
-                                        const getSubtasks = (parentId) => sectionTasks.filter(t => t.parent_task_id === parentId);
-                                        
-                                        return (
-                                            <div key={sectionName} className="archive-section">
-                                                <h4 className="archive-section-title">{sectionName}</h4>
-                                                <ul className="task-list">
-                                                    {parentTasks.map(task => (
-                                                        <React.Fragment key={task.id}>
-                                                            <li className={`task ${task.completed ? 'completed' : ''}`}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="checkbox"
-                                                                    checked={task.completed}
-                                                                    disabled
-                                                                />
-                                                                <div className="task-content">
-                                                                    <span className="task-text">{task.text}</span>
-                                                                </div>
-                                                                {task.template_id && (
-                                                                    <span className="badge badge-daily">Daily</span>
-                                                                )}
-                                                            </li>
-                                                            {getSubtasks(task.id).map(subtask => (
-                                                                <li key={subtask.id} className={`task ${subtask.completed ? 'completed' : ''}`} style={{marginLeft: '2rem'}}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="checkbox"
-                                                                        checked={subtask.completed}
-                                                                        disabled
-                                                                    />
-                                                                    <div className="task-content">
-                                                                        <span className="task-text">{subtask.text}</span>
-                                                                    </div>
-                                                                </li>
-                                                            ))}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {archiveData.stories && (
-                                <div className="archive-section">
-                                    <h4 className="archive-section-title" style={{color: 'var(--gold)'}}>
-                                        📖 Stories
-                                    </h4>
-                                    {archiveData.stories.different && (
-                                        <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
-                                                What was different?
-                                            </div>
-                                            <div>{archiveData.stories.different}</div>
-                                        </div>
-                                    )}
-                                    {archiveData.stories.tension && (
-                                        <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
-                                                What had tension?
-                                            </div>
-                                            <div>{archiveData.stories.tension}</div>
-                                        </div>
-                                    )}
-                                    {archiveData.stories.detail && (
-                                        <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
-                                                What specific detail?
-                                            </div>
-                                            <div>{archiveData.stories.detail}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                <p style={{color: 'var(--ash)', fontSize: '0.875rem'}}>
+                                    (Full task features coming in next update)
+                                </p>
+                            </div>
+                        ))
                     )}
                 </div>
             );
