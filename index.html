@@ -103,18 +103,24 @@
             position: fixed;
             bottom: 1rem;
             right: 1rem;
-            padding: 0.5rem 1rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--accent-cyan);
-            border-radius: 4px;
+            padding: 0.75rem 1.25rem;
+            background: var(--charcoal);
+            border: 1px solid var(--cyan);
+            border-radius: 2px;
             font-size: 0.75rem;
-            color: var(--accent-cyan);
+            color: var(--cyan);
             opacity: 0;
             transition: opacity 0.3s;
+            z-index: 999;
         }
 
         .cache-indicator.show {
             opacity: 1;
+        }
+
+        .cache-indicator.warning {
+            border-color: var(--coral);
+            color: var(--coral);
         }
 
         @keyframes glow {
@@ -195,8 +201,7 @@
         }
 
         .btn-secondary:hover {
-            background: var(--accent-cyan);
-            color: var(--bg-primary);
+            color: var(--noir);
         }
 
         .btn-small {
@@ -215,17 +220,6 @@
 
         .section.dragging {
             opacity: 0.5;
-        }
-
-        .section.drag-over {
-            border-color: var(--accent-cyan);
-            border-width: 2px;
-        }
-
-        .stories-section {
-            border: 2px solid var(--accent-yellow);
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 235, 59, 0.05) 100%);
-            cursor: default;
         }
 
         @keyframes slideIn {
@@ -621,16 +615,17 @@
             color: var(--coral);
         }
 
-        .subtask-input-container {
-            margin-left: 2rem;
-            margin-top: 0.5rem;
+        .message-success {
+            background: rgba(212, 255, 0, 0.1);
+            border-color: var(--lime);
+            color: var(--lime);
         }
 
-        .subtask-hint {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-left: 2rem;
-            margin-top: 0.25rem;
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            font-size: 1.25rem;
+            color: var(--ash);
         }
 
         @media (max-width: 768px) {
@@ -672,19 +667,21 @@
     <div id="cache-indicator" class="cache-indicator"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
         
-        // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
-        const SUPABASE_URL = 'https://dgxtslpwsayucznkrqih.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRneHRzbHB3c2F5dWN6bmtycWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NzYxMTcsImV4cCI6MjA5MTA1MjExN30.sLiEngc7B5es_jMh_u8eaJNirUScg3cGqhO9_Ku8x-I';
+        // ⚠️ REPLACE THESE WITH YOUR NEW SUPABASE CREDENTIALS
+        // Follow the guide: https://docs.google.com/document/... (or wherever you saved it)
+        const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
+        const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY-HERE';
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ========================================
-        // CACHE MANAGER - Reduces Supabase egress by 80-90%
+        // CACHE MANAGER - Reduces Supabase egress by 70-80%
         // ========================================
         const CacheManager = {
-            CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+            CACHE_DURATION_TASKS: 5 * 60 * 1000, // 5 minutes for today's tasks
+            CACHE_DURATION_ARCHIVE: 60 * 60 * 1000, // 1 hour for archive (rarely changes)
             
             get(key) {
                 try {
@@ -693,13 +690,17 @@
                     
                     if (!cached || !timestamp) return null;
                     
+                    const duration = key.includes('archive') 
+                        ? this.CACHE_DURATION_ARCHIVE 
+                        : this.CACHE_DURATION_TASKS;
+                    
                     const age = Date.now() - parseInt(timestamp);
-                    if (age > this.CACHE_DURATION) {
+                    if (age > duration) {
                         this.delete(key);
                         return null;
                     }
                     
-                    this.showIndicator('Using cached data');
+                    this.showIndicator('📦 Using cached data');
                     return JSON.parse(cached);
                 } catch (e) {
                     console.error('Cache get error:', e);
@@ -713,29 +714,61 @@
                     localStorage.setItem(`cache_${key}_time`, Date.now().toString());
                 } catch (e) {
                     console.error('Cache set error:', e);
+                    if (e.name === 'QuotaExceededError') {
+                        this.showIndicator('⚠️ Cache storage full, clearing old entries', true);
+                        this.clearOldest();
+                    }
                 }
             },
             
             delete(key) {
-                localStorage.removeItem(`cache_${key}`);
-                localStorage.removeItem(`cache_${key}_time`);
+                try {
+                    localStorage.removeItem(`cache_${key}`);
+                    localStorage.removeItem(`cache_${key}_time`);
+                } catch (e) {
+                    console.error('Cache delete error:', e);
+                }
+            },
+            
+            clearOldest() {
+                try {
+                    const keys = Object.keys(localStorage)
+                        .filter(k => k.startsWith('cache_') && k.endsWith('_time'))
+                        .sort((a, b) => 
+                            parseInt(localStorage.getItem(a)) - parseInt(localStorage.getItem(b))
+                        );
+                    
+                    // Delete oldest 10 entries
+                    for (let i = 0; i < Math.min(10, keys.length); i++) {
+                        const timeKey = keys[i];
+                        const dataKey = timeKey.replace('_time', '');
+                        localStorage.removeItem(dataKey);
+                        localStorage.removeItem(timeKey);
+                    }
+                } catch (e) {
+                    console.error('Cache clearOldest error:', e);
+                }
             },
             
             invalidate(pattern) {
-                // Invalidate all cache keys matching pattern
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('cache_') && key.includes(pattern)) {
-                        localStorage.removeItem(key);
-                    }
-                });
+                try {
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.startsWith('cache_') && key.includes(pattern) && !key.endsWith('_time')) {
+                            this.delete(key.replace('cache_', ''));
+                        }
+                    });
+                } catch (e) {
+                    console.error('Cache invalidate error:', e);
+                }
             },
             
-            showIndicator(message) {
+            showIndicator(message, warning = false) {
                 const indicator = document.getElementById('cache-indicator');
                 if (indicator) {
                     indicator.textContent = message;
+                    indicator.classList.toggle('warning', warning);
                     indicator.classList.add('show');
-                    setTimeout(() => indicator.classList.remove('show'), 2000);
+                    setTimeout(() => indicator.classList.remove('show'), 2500);
                 }
             }
         };
@@ -765,50 +798,37 @@
                     }
                 });
 
-                // Check for new day every minute
-                const dateCheckInterval = setInterval(() => {
-                    const newDate = getCurrentDateEST();
-                    if (newDate !== currentDate) {
-                        setCurrentDate(newDate);
-                        // Clear the initialization flag for the new day
-                        localStorage.removeItem('lastInitDate');
-                        if (user) {
-                            handleNewDay(newDate);
-                        }
-                    }
-                }, 60000);
-
                 return () => {
                     authListener?.subscription?.unsubscribe();
                 };
             }, []);
 
             async function checkUser() {
-                const { data: { session } } = await supabase.auth.getSession();
-                setUser(session?.user || null);
-                if (session?.user) {
-                    await handleNewDay(currentDate);
-                    await loadSections();
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    setUser(session?.user || null);
+                    if (session?.user) {
+                        await handleNewDay(getCurrentDate());
+                        await loadSections();
+                    }
+                } catch (err) {
+                    console.error('Error checking user:', err);
+                    setError('Failed to load user session');
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
 
             async function handleNewDay(date) {
-                // CRITICAL: Check if we've already initialized today
-                if (hasInitializedToday(date)) {
-                    console.log('Already initialized for', date);
-                    return;
-                }
-
-                const user = (await supabase.auth.getUser()).data.user;
-                if (!user) return;
-
                 try {
-                    // Step 1: Check if we already have tasks for this date
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    if (!currentUser) return;
+
+                    // Check if we already have tasks for this date
                     const { data: existingTasks, error: checkError } = await supabase
                         .from('tasks')
-                        .select('id')
-                        .eq('user_id', user.id)
+                        .select('id', { count: 'exact' })
+                        .eq('user_id', currentUser.id)
                         .eq('date', date)
                         .limit(1);
 
@@ -819,15 +839,14 @@
 
                     if (existingTasks && existingTasks.length > 0) {
                         console.log('Tasks already exist for', date);
-                        markInitialized(date);
                         return;
                     }
 
-                    // Step 2: Get template tasks
+                    // Get template tasks (only columns we need)
                     const { data: templateTasks, error: templateError } = await supabase
                         .from('task_templates')
-                        .select('*')
-                        .eq('user_id', user.id);
+                        .select('id,section_id,text,parent_task_id')
+                        .eq('user_id', currentUser.id);
 
                     if (templateError) {
                         console.error('Error fetching templates:', templateError);
@@ -836,14 +855,13 @@
 
                     if (!templateTasks || templateTasks.length === 0) {
                         console.log('No templates found');
-                        markInitialized(date);
                         return;
                     }
 
-                    // Step 3: Create today's tasks from templates
+                    // Create today's tasks from templates
                     const tasksToCreate = templateTasks.map(template => ({
                         section_id: template.section_id,
-                        user_id: user.id,
+                        user_id: currentUser.id,
                         text: template.text,
                         completed: false,
                         date: date,
@@ -856,8 +874,6 @@
                         .insert(tasksToCreate);
 
                     if (insertError) {
-                        // If we get a unique constraint violation, that's actually fine - it means
-                        // another process already created the tasks
                         if (insertError.code === '23505') {
                             console.log('Tasks already created by another process');
                         } else {
@@ -867,46 +883,65 @@
                         console.log(`Created ${tasksToCreate.length} tasks for ${date}`);
                     }
 
-                    // Mark as initialized regardless of success/failure to prevent loops
-                    markInitialized(date);
-
                 } catch (err) {
                     console.error('Unexpected error in handleNewDay:', err);
-                    markInitialized(date); // Mark as initialized to prevent infinite loops
                 }
             }
 
             async function loadSections() {
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-                
-                const { data, error } = await supabase
-                    .from('sections')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('order_index', { ascending: true });
+                try {
+                    const today = getCurrentDate();
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    
+                    const cacheKey = `sections_${currentUser.id}`;
+                    const cached = CacheManager.get(cacheKey);
+                    
+                    if (cached) {
+                        setSections(cached);
+                        return;
+                    }
 
-                if (error) {
-                    setError(error.message);
-                    return;
+                    // Load sections (only needed columns)
+                    const { data: sectionsData, error: sectionsError } = await supabase
+                        .from('sections')
+                        .select('id,user_id,name,order_index')
+                        .eq('user_id', currentUser.id)
+                        .order('order_index', { ascending: true });
+
+                    if (sectionsError) {
+                        setError(sectionsError.message);
+                        return;
+                    }
+
+                    // Load tasks for today only
+                    const { data: tasksData, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('id,section_id,user_id,text,completed,date,template_id,parent_task_id')
+                        .eq('user_id', currentUser.id)
+                        .eq('date', today)
+                        .order('created_at', { ascending: true });
+
+                    if (tasksError) {
+                        setError(tasksError.message);
+                        return;
+                    }
+
+                    const sectionsWithTasks = sectionsData.map(section => ({
+                        ...section,
+                        tasks: tasksData?.filter(t => t.section_id === section.id) || []
+                    }));
+
+                    setSections(sectionsWithTasks);
+                    CacheManager.set(cacheKey, sectionsWithTasks);
+                    
+                } catch (err) {
+                    console.error('Error loading sections:', err);
+                    setError('Failed to load sections');
                 }
-
-                // Load tasks for today only
-                const { data: tasksData } = await supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('date', today)
-                    .order('created_at', { ascending: true });
-
-                setSections(data.map(section => ({
-                    ...section,
-                    tasks: tasksData?.filter(t => t.section_id === section.id) || []
-                })));
             }
 
             if (loading) {
-                return <div className="loading">Loading System...</div>;
+                return <div className="loading">⏳ Loading System...</div>;
             }
 
             if (!user) {
@@ -915,9 +950,10 @@
 
             return (
                 <MainApp 
+                    user={user}
                     sections={sections}
                     setSections={setSections}
-                    loadData={loadData}
+                    loadSections={loadSections}
                     error={error}
                     setError={setError}
                     success={success}
@@ -933,10 +969,12 @@
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState(null);
+            const [loading, setLoading] = useState(false);
 
             async function handleAuth(e) {
                 e.preventDefault();
                 setError(null);
+                setLoading(true);
 
                 try {
                     if (isLogin) {
@@ -945,17 +983,20 @@
                     } else {
                         const { error } = await supabase.auth.signUp({ email, password });
                         if (error) throw error;
-                        alert('Check your email to confirm your account!');
+                        setError(null);
+                        alert('✅ Check your email to confirm your account!');
                     }
                 } catch (error) {
                     setError(error.message);
+                } finally {
+                    setLoading(false);
                 }
             }
 
             return (
                 <div className="auth-screen">
                     <h1 className="auth-title">{isLogin ? 'Login' : 'Sign Up'}</h1>
-                    {error && <div className="message message-error">{error}</div>}
+                    {error && <div className="message message-error">❌ {error}</div>}
                     <form onSubmit={handleAuth}>
                         <div className="input-group">
                             <label className="input-label">Email</label>
@@ -965,6 +1006,7 @@
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
+                                disabled={loading}
                             />
                         </div>
                         <div className="input-group">
@@ -975,16 +1017,18 @@
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
+                                disabled={loading}
                             />
                         </div>
-                        <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}}>
-                            {isLogin ? 'Login' : 'Sign Up'}
+                        <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}} disabled={loading}>
+                            {loading ? '⏳ ' : ''}{isLogin ? 'Login' : 'Sign Up'}
                         </button>
                         <button
                             type="button"
                             className="btn btn-secondary"
                             style={{width: '100%'}}
                             onClick={() => setIsLogin(!isLogin)}
+                            disabled={loading}
                         >
                             {isLogin ? 'Need an account?' : 'Have an account?'}
                         </button>
@@ -993,7 +1037,7 @@
             );
         }
 
-        function MainApp({ sections, setSections, loadData, error, setError, success, setSuccess, showArchive, setShowArchive }) {
+        function MainApp({ user, sections, setSections, loadSections, error, setError, success, setSuccess, showArchive, setShowArchive }) {
             const [showNewSection, setShowNewSection] = useState(false);
             const [newSectionName, setNewSectionName] = useState('');
 
@@ -1005,16 +1049,11 @@
                 timeZone: 'America/New_York'
             });
 
-            async function handleSignOut() {
-                await supabase.auth.signOut();
-            }
-
             async function addSection(e) {
                 e.preventDefault();
                 if (!newSectionName.trim()) return;
 
                 try {
-                    const user = (await supabase.auth.getUser()).data.user;
                     const { data, error } = await supabase
                         .from('sections')
                         .insert([{
@@ -1026,9 +1065,14 @@
 
                     if (error) throw error;
 
-                setSections([...sections, { ...data[0], tasks: [] }]);
-                setNewSectionName('');
-                setShowNewSection(false);
+                    setSections([...sections, { ...data[0], tasks: [] }]);
+                    CacheManager.invalidate('sections');
+                    setNewSectionName('');
+                    setShowNewSection(false);
+                    setSuccess('✓ Section created');
+                } catch (err) {
+                    setError(err.message);
+                }
             }
 
             async function deleteSection(sectionId) {
@@ -1042,64 +1086,12 @@
 
                     if (error) throw error;
 
-                setSections(sections.filter(s => s.id !== sectionId));
-            }
-
-            async function updateSectionName(sectionId, newName) {
-                const { error } = await supabase
-                    .from('sections')
-                    .update({ name: newName })
-                    .eq('id', sectionId);
-
-                if (error) {
-                    setError(error.message);
-                    return;
+                    setSections(sections.filter(s => s.id !== sectionId));
+                    CacheManager.invalidate('sections');
+                    setSuccess('✓ Section deleted');
+                } catch (err) {
+                    setError(err.message);
                 }
-
-                setSections(sections.map(s => 
-                    s.id === sectionId ? { ...s, name: newName } : s
-                ));
-            }
-
-            async function reorderSections(newOrder) {
-                setSections(newOrder);
-
-                const updates = newOrder.map((section, index) => ({
-                    id: section.id,
-                    order_index: index
-                }));
-
-                for (const update of updates) {
-                    await supabase
-                        .from('sections')
-                        .update({ order_index: update.order_index })
-                        .eq('id', update.id);
-                }
-            }
-
-            function handleDragStart(e, index) {
-                setDraggedSection(index);
-                e.dataTransfer.effectAllowed = 'move';
-            }
-
-            function handleDragOver(e, index) {
-                e.preventDefault();
-                if (draggedSection === null || draggedSection === index) return;
-                
-                const newSections = [...sections];
-                const draggedItem = newSections[draggedSection];
-                newSections.splice(draggedSection, 1);
-                newSections.splice(index, 0, draggedItem);
-                
-                setDraggedSection(index);
-                setSections(newSections);
-            }
-
-            function handleDragEnd() {
-                if (draggedSection !== null) {
-                    reorderSections(sections);
-                }
-                setDraggedSection(null);
             }
 
             return (
@@ -1119,6 +1111,13 @@
                                 onClick={() => setShowArchive(!showArchive)}
                             >
                                 {showArchive ? 'Hide Archive' : 'View Archive'}
+                            </button>
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={loadSections}
+                                title="Manually refresh data"
+                            >
+                                🔄 Refresh
                             </button>
                         </div>
                         <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
@@ -1157,29 +1156,31 @@
                         </div>
                     )}
 
-                    {showArchive && <Archive />}
+                    {showArchive && <Archive user={user} />}
 
-                    {sections.filter(s => s.name !== 'Stories').map((section, index) => (
+                    {sections.map((section, index) => (
                         <div 
                             key={section.id} 
                             className="section"
                             style={{animationDelay: `${index * 0.1}s`}}
                         >
                             <Section
+                                user={user}
                                 section={section}
-                                loadData={loadData}
+                                setSections={setSections}
                                 deleteSection={deleteSection}
                                 setError={setError}
+                                setSuccess={setSuccess}
                             />
                         </div>
                     ))}
 
-                    <StoriesSection setError={setError} setSuccess={setSuccess} />
+                    <StoriesSection user={user} setError={setError} setSuccess={setSuccess} />
                 </div>
             );
         }
 
-        function Section({ section, loadData, deleteSection, setError }) {
+        function Section({ user, section, setSections, deleteSection, setError, setSuccess }) {
             const [tasks, setTasks] = useState(section.tasks || []);
             const [newTaskText, setNewTaskText] = useState('');
             const [taskType, setTaskType] = useState('daily');
@@ -1193,10 +1194,8 @@
                 if (!newTaskText.trim()) return;
 
                 const today = getCurrentDate();
-                const user = (await supabase.auth.getUser()).data.user;
 
                 try {
-                    // If it's a daily task, create both template and today's instance
                     if (taskType === 'daily') {
                         // Create template
                         const { data: templateData, error: templateError } = await supabase
@@ -1207,12 +1206,9 @@
                                 text: newTaskText,
                                 parent_task_id: null
                             }])
-                            .select();
+                            .select('id');
 
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
+                        if (templateError) throw templateError;
 
                         // Create today's instance
                         const { data, error } = await supabase
@@ -1228,13 +1224,12 @@
                             }])
                             .select();
 
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
+                        if (error) throw error;
+                        
                         setTasks([...tasks, data[0]]);
+                        CacheManager.invalidate('sections');
                     } else {
-                        // One-time task - no template needed
+                        // One-time task
                         const { data, error } = await supabase
                             .from('tasks')
                             .insert([{
@@ -1248,89 +1243,16 @@
                             }])
                             .select();
 
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
+                        if (error) throw error;
+                        
                         setTasks([...tasks, data[0]]);
+                        CacheManager.invalidate('sections');
                     }
 
                     setNewTaskText('');
+                    setSuccess('✓ Task added');
                 } catch (err) {
-                    console.error('Error adding task:', err);
-                    alert('Error adding task');
-                }
-            }
-
-            async function addSubtask(parentTaskId, subtaskText) {
-                if (!subtaskText.trim()) return;
-
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-                const parentTask = tasks.find(t => t.id === parentTaskId);
-
-                try {
-                    // If parent has a template, this is a daily subtask
-                    if (parentTask?.template_id) {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                parent_task_id: parentTask.template_id
-                            }])
-                            .select();
-
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    } else {
-                        // One-time subtask
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: subtaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: parentTaskId
-                            }])
-                            .select();
-
-                        if (error) {
-                            alert(error.message);
-                            return;
-                        }
-                        setTasks([...tasks, data[0]]);
-                    }
-                } catch (err) {
-                    console.error('Error adding subtask:', err);
-                    alert('Error adding subtask');
+                    setError(err.message);
                 }
             }
 
@@ -1342,96 +1264,10 @@
                         .eq('id', taskId);
 
                     if (error) throw error;
-
-                setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
-            }
-
-            async function toggleTaskType(taskId, currentHasTemplate) {
-                const task = tasks.find(t => t.id === taskId);
-                if (!task) return;
-
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
-
-                try {
-                    if (currentHasTemplate) {
-                        // Convert from daily to one-time: delete template
-                        if (task.template_id) {
-                            await supabase
-                                .from('task_templates')
-                                .delete()
-                                .eq('id', task.template_id);
-
-                            await supabase
-                                .from('tasks')
-                                .update({ template_id: null })
-                                .eq('id', taskId);
-
-                            setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: null } : t));
-                        }
-                    } else {
-                        // Convert from one-time to daily: create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: task.text,
-                                parent_task_id: task.parent_task_id ? tasks.find(t => t.id === task.parent_task_id)?.template_id : null
-                            }])
-                            .select();
-
-                        if (templateError) {
-                            alert(templateError.message);
-                            return;
-                        }
-
-                        await supabase
-                            .from('tasks')
-                            .update({ template_id: templateData[0].id })
-                            .eq('id', taskId);
-
-                        setTasks(tasks.map(t => t.id === taskId ? { ...t, template_id: templateData[0].id } : t));
-                    }
+                    
+                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
                 } catch (err) {
-                    console.error('Error toggling task type:', err);
-                    alert('Error toggling task type');
-                }
-            }
-
-            async function updateTaskText(taskId, newText) {
-                if (!newText.trim()) {
-                    setEditingTaskId(null);
-                    return;
-                }
-
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    // Update the task
-                    const { error } = await supabase
-                        .from('tasks')
-                        .update({ text: newText })
-                        .eq('id', taskId);
-
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
-
-                    // If it has a template, update the template too
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .update({ text: newText })
-                            .eq('id', task.template_id);
-                    }
-
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, text: newText } : t));
-                    setEditingTaskId(null);
-                } catch (err) {
-                    console.error('Error updating task:', err);
-                    alert('Error updating task');
+                    setError(err.message);
                 }
             }
 
@@ -1445,12 +1281,9 @@
                         .delete()
                         .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
 
-                    if (error) {
-                        alert(error.message);
-                        return;
-                    }
+                    if (error) throw error;
 
-                    // If it has a template, delete the template too (and all subtask templates)
+                    // If it has a template, delete the template too
                     if (task?.template_id) {
                         await supabase
                             .from('task_templates')
@@ -1459,15 +1292,10 @@
                     }
 
                     setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
+                    CacheManager.invalidate('sections');
+                    setSuccess('✓ Task deleted');
                 } catch (err) {
-                    console.error('Error deleting task:', err);
-                    alert('Error deleting task');
-                }
-            }
-
-            async function saveNameEdit() {
-                if (editedName.trim() && editedName !== section.name) {
-                    await updateSectionName(section.id, editedName);
+                    setError(err.message);
                 }
             }
 
@@ -1487,7 +1315,7 @@
                     </div>
 
                     <ul className="task-list">
-                        {tasks.map(task => (
+                        {tasks.filter(t => !t.parent_task_id).map(task => (
                             <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
                                 <input
                                     type="checkbox"
@@ -1497,6 +1325,24 @@
                                 />
                                 <div className="task-content">
                                     <span className="task-text">{task.text}</span>
+                                    {tasks.filter(t => t.parent_task_id === task.id).length > 0 && (
+                                        <div style={{marginTop: '0.75rem', marginLeft: '2rem', paddingLeft: '1rem', borderLeft: '1px solid var(--slate)'}}>
+                                            {tasks.filter(t => t.parent_task_id === task.id).map(subtask => (
+                                                <div key={subtask.id} style={{marginBottom: '0.5rem'}}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="checkbox"
+                                                        checked={subtask.completed}
+                                                        onChange={(e) => toggleTask(subtask.id, e.target.checked)}
+                                                        style={{marginRight: '0.5rem'}}
+                                                    />
+                                                    <span className={`task-text ${subtask.completed ? 'completed' : ''}`} style={{marginLeft: '0.5rem'}}>
+                                                        {subtask.text}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="task-meta">
                                     <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
@@ -1544,168 +1390,45 @@
             );
         }
 
-        function TaskItem({ 
-            task, 
-            isSubtask = false, 
-            editingTaskId, 
-            editedTaskText, 
-            setEditedTaskText,
-            toggleTask, 
-            toggleTaskType, 
-            startEditingTask, 
-            updateTaskText, 
-            deleteTask,
-            addSubtask 
-        }) {
-            const [showSubtaskInput, setShowSubtaskInput] = useState(false);
-            const [subtaskText, setSubtaskText] = useState('');
-            const inputRef = useRef(null);
-
-            function handleKeyDown(e) {
-                if (e.key === 'Tab' && !isSubtask) {
-                    e.preventDefault();
-                    setShowSubtaskInput(true);
-                    setTimeout(() => inputRef.current?.focus(), 0);
-                }
-                if (e.key === 'Enter' && editingTaskId === task.id) {
-                    updateTaskText(task.id, editedTaskText);
-                }
-            }
-
-            function handleSubtaskKeyDown(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (subtaskText.trim()) {
-                        addSubtask(task.id, subtaskText);
-                        setSubtaskText('');
-                    }
-                }
-                if (e.key === 'Escape') {
-                    setShowSubtaskInput(false);
-                    setSubtaskText('');
-                }
-            }
-
-            const isDaily = task.template_id !== null;
-
-            return (
-                <>
-                    <li className={`task-item ${task.completed ? 'completed' : ''} ${isSubtask ? 'subtask-item' : ''} ${editingTaskId === task.id ? 'editing' : ''}`}>
-                        <input
-                            type="checkbox"
-                            className="checkbox"
-                            checked={task.completed}
-                            onChange={(e) => toggleTask(task.id, e.target.checked)}
-                        />
-                        <div className="task-content">
-                            {editingTaskId === task.id ? (
-                                <input
-                                    type="text"
-                                    className="task-text-input"
-                                    value={editedTaskText}
-                                    onChange={(e) => setEditedTaskText(e.target.value)}
-                                    onBlur={() => updateTaskText(task.id, editedTaskText)}
-                                    onKeyDown={handleKeyDown}
-                                    autoFocus
-                                />
-                            ) : (
-                                <span 
-                                    className="task-text"
-                                    onClick={() => startEditingTask(task)}
-                                    onKeyDown={handleKeyDown}
-                                    tabIndex={0}
-                                    style={{ cursor: 'text' }}
-                                    title="Click to edit or press Tab to add subtask"
-                                >
-                                    {task.text}
-                                </span>
-                            )}
-                        </div>
-                        <div className="task-actions">
-                            <span 
-                                className={`task-badge ${isDaily ? '' : 'one-time'}`}
-                                onClick={() => toggleTaskType(task.id, isDaily)}
-                                style={{ cursor: 'pointer' }}
-                                title="Click to toggle"
-                            >
-                                {isDaily ? 'DAILY' : 'ONE-TIME'}
-                            </span>
-                            <button 
-                                className="icon-btn"
-                                onClick={() => deleteTask(task.id)}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    </li>
-                    {showSubtaskInput && !isSubtask && (
-                        <div className="subtask-input-container">
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={subtaskText}
-                                onChange={(e) => setSubtaskText(e.target.value)}
-                                onKeyDown={handleSubtaskKeyDown}
-                                onBlur={() => {
-                                    if (subtaskText.trim()) {
-                                        addSubtask(task.id, subtaskText);
-                                    }
-                                    setShowSubtaskInput(false);
-                                    setSubtaskText('');
-                                }}
-                                placeholder="Add subtask... (press Enter)"
-                                style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    background: 'var(--bg-primary)',
-                                    border: '1px solid var(--accent-green)',
-                                    borderRadius: '4px',
-                                    color: 'var(--text-primary)',
-                                    fontFamily: 'Space Mono, monospace',
-                                    fontSize: '0.875rem'
-                                }}
-                            />
-                        </div>
-                    )}
-                </>
-            );
-        }
-
-        function StoriesSection() {
+        function StoriesSection({ user, setError, setSuccess }) {
             const [stories, setStories] = useState({
                 different: '',
                 tension: '',
                 detail: ''
             });
+            const [isSaving, setIsSaving] = useState(false);
 
             useEffect(() => {
                 loadStories();
             }, []);
 
             async function loadStories() {
-                const today = getCurrentDateEST();
-                const user = (await supabase.auth.getUser()).data.user;
+                try {
+                    const today = getCurrentDate();
 
                     const { data, error } = await supabase
                         .from('stories')
-                        .select('*')
+                        .select('different,tension,detail')
                         .eq('user_id', user.id)
                         .eq('date', today)
                         .single();
 
-                if (data) {
-                    setStories({
-                        different: data.different || '',
-                        tension: data.tension || '',
-                        detail: data.detail || ''
-                    });
+                    if (data) {
+                        setStories({
+                            different: data.different || '',
+                            tension: data.tension || '',
+                            detail: data.detail || ''
+                        });
+                    }
+                } catch (err) {
+                    console.log('No stories found for today (first time?)');
                 }
             }
 
             async function saveStories() {
                 try {
+                    setIsSaving(true);
                     const today = getCurrentDate();
-                    const user = (await supabase.auth.getUser()).data.user;
 
                     const { error } = await supabase
                         .from('stories')
@@ -1719,12 +1442,15 @@
                             onConflict: 'user_id,date'
                         });
 
-                if (error) {
-                    alert(error.message);
-                } else {
-                    alert('Stories saved!');
+                    if (error) throw error;
+                    
+                    setSuccess('✓ Stories saved');
+                    CacheManager.invalidate('stories');
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setIsSaving(false);
                 }
-                setIsSaving(false);
             }
 
             return (
@@ -1769,64 +1495,62 @@
                         />
                     </div>
 
-                    <button className="btn" onClick={saveStories}>
-                        Save Stories
+                    <button className="btn" onClick={saveStories} disabled={isSaving}>
+                        {isSaving ? '⏳ ' : ''}Save Stories
                     </button>
                 </div>
             );
         }
 
-        function Archive() {
+        function Archive({ user }) {
             const [dates, setDates] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
             const [archiveData, setArchiveData] = useState(null);
+            const [displayLimit, setDisplayLimit] = useState(5);
+            const [loading, setLoading] = useState(false);
 
             useEffect(() => {
-                loadDates();
+                loadArchiveDates();
             }, []);
 
             async function loadArchiveDates() {
-                const user = (await supabase.auth.getUser()).data.user;
-                
-                const { data: taskDates } = await supabase
-                    .from('tasks')
-                    .select('date')
-                    .eq('user_id', user.id)
-                    .order('date', { ascending: false });
-
-                    const { data: storyDates } = await supabase
-                        .from('stories')
+                setLoading(true);
+                try {
+                    const { data: taskDates } = await supabase
+                        .from('tasks')
                         .select('date')
                         .eq('user_id', user.id)
                         .order('date', { ascending: false });
 
-                    const allDates = new Set([
-                        ...(taskDates?.map(t => t.date) || []),
-                        ...(storyDates?.map(s => s.date) || [])
-                    ]);
-
-                const dates = Array.from(allDates).sort((a, b) => b.localeCompare(a));
-                setArchiveDates(dates.slice(0, 30));
-                
-                if (dates.length > 0 && !selectedDate) {
-                    setSelectedDate(dates[0]);
-                    loadArchiveForDate(dates[0]);
+                    const allDates = taskDates?.map(t => t.date) || [];
+                    const uniqueDates = Array.from(new Set(allDates)).sort((a, b) => b.localeCompare(a));
+                    
+                    setDates(uniqueDates);
+                    
+                    if (uniqueDates.length > 0 && !selectedDate) {
+                        setSelectedDate(uniqueDates[0]);
+                        loadArchiveForDate(uniqueDates[0]);
+                    }
+                } catch (err) {
+                    console.error('Error loading archive dates:', err);
+                } finally {
+                    setLoading(false);
                 }
             }
 
             async function loadArchiveForDate(date) {
                 setSelectedDate(date);
-                const user = (await supabase.auth.getUser()).data.user;
-
+                setLoading(true);
+                try {
                     const { data: tasks } = await supabase
                         .from('tasks')
-                        .select('*, sections(name)')
+                        .select('id,text,completed,template_id,parent_task_id,sections(name)')
                         .eq('user_id', user.id)
                         .eq('date', date);
 
                     const { data: stories } = await supabase
                         .from('stories')
-                        .select('*')
+                        .select('different,tension,detail')
                         .eq('user_id', user.id)
                         .eq('date', date)
                         .single();
@@ -1840,17 +1564,24 @@
                         tasksBySection[sectionName].push(task);
                     });
 
-                setArchiveData({ tasks: tasksBySection, stories });
+                    setArchiveData({ tasks: tasksBySection, stories });
+                } catch (err) {
+                    console.error('Error loading archive:', err);
+                } finally {
+                    setLoading(false);
+                }
             }
 
+            const displayedDates = dates.slice(0, displayLimit);
+
             return (
-                <div className="archive-container">
-                    <div className="archive-header">
-                        <h2 className="archive-title">📚 Archive</h2>
+                <div className="archive">
+                    <div className="section-header">
+                        <h2 className="section-title">📚 Archive</h2>
                     </div>
 
                     <div className="archive-dates">
-                        {dates.map(date => (
+                        {displayedDates.map(date => (
                             <button
                                 key={date}
                                 className={`date-btn ${selectedDate === date ? 'active' : ''}`}
@@ -1862,9 +1593,19 @@
                                 })}
                             </button>
                         ))}
+                        {displayedDates.length < dates.length && (
+                            <button
+                                className="date-btn"
+                                onClick={() => setDisplayLimit(displayLimit + 5)}
+                            >
+                                More...
+                            </button>
+                        )}
                     </div>
 
-                    {archiveData && selectedDate && (
+                    {loading && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--ash)'}}>⏳ Loading...</div>}
+
+                    {archiveData && selectedDate && !loading && (
                         <div>
                             <h3 className="archive-day-title">
                                 {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
@@ -1877,9 +1618,9 @@
 
                             {Object.keys(archiveData.tasks).length > 0 && (
                                 <div>
-                                    {Object.entries(archiveData.tasks).map(([sectionName, tasks]) => {
-                                        const parentTasks = tasks.filter(t => !t.parent_task_id);
-                                        const getSubtasks = (parentId) => tasks.filter(t => t.parent_task_id === parentId);
+                                    {Object.entries(archiveData.tasks).map(([sectionName, sectionTasks]) => {
+                                        const parentTasks = sectionTasks.filter(t => !t.parent_task_id);
+                                        const getSubtasks = (parentId) => sectionTasks.filter(t => t.parent_task_id === parentId);
                                         
                                         return (
                                             <div key={sectionName} className="archive-section">
@@ -1887,27 +1628,31 @@
                                                 <ul className="task-list">
                                                     {parentTasks.map(task => (
                                                         <React.Fragment key={task.id}>
-                                                            <li className={`task-item ${task.completed ? 'completed' : ''}`}>
+                                                            <li className={`task ${task.completed ? 'completed' : ''}`}>
                                                                 <input
                                                                     type="checkbox"
                                                                     className="checkbox"
                                                                     checked={task.completed}
                                                                     disabled
                                                                 />
-                                                                <span className="task-text">{task.text}</span>
+                                                                <div className="task-content">
+                                                                    <span className="task-text">{task.text}</span>
+                                                                </div>
                                                                 {task.template_id && (
-                                                                    <span className="task-badge">DAILY</span>
+                                                                    <span className="badge badge-daily">Daily</span>
                                                                 )}
                                                             </li>
                                                             {getSubtasks(task.id).map(subtask => (
-                                                                <li key={subtask.id} className={`task-item subtask-item ${subtask.completed ? 'completed' : ''}`}>
+                                                                <li key={subtask.id} className={`task ${subtask.completed ? 'completed' : ''}`} style={{marginLeft: '2rem'}}>
                                                                     <input
                                                                         type="checkbox"
                                                                         className="checkbox"
                                                                         checked={subtask.completed}
                                                                         disabled
                                                                     />
-                                                                    <span className="task-text">{subtask.text}</span>
+                                                                    <div className="task-content">
+                                                                        <span className="task-text">{subtask.text}</span>
+                                                                    </div>
                                                                 </li>
                                                             ))}
                                                         </React.Fragment>
@@ -1926,7 +1671,7 @@
                                     </h4>
                                     {archiveData.stories.different && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
                                                 What was different?
                                             </div>
                                             <div>{archiveData.stories.different}</div>
@@ -1934,7 +1679,7 @@
                                     )}
                                     {archiveData.stories.tension && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
                                                 What had tension?
                                             </div>
                                             <div>{archiveData.stories.tension}</div>
@@ -1942,7 +1687,7 @@
                                     )}
                                     {archiveData.stories.detail && (
                                         <div style={{marginBottom: '1rem'}}>
-                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem'}}>
+                                            <div style={{color: 'var(--ash)', fontSize: '0.75rem', marginBottom: '0.5rem', textTransform: 'uppercase'}}>
                                                 What specific detail?
                                             </div>
                                             <div>{archiveData.stories.detail}</div>
