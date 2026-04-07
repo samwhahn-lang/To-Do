@@ -31,6 +31,16 @@ create table sections (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Create templates for repeating tasks
+create table task_templates (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users not null,
+  section_id uuid references sections(id) on delete cascade not null,
+  text text not null,
+  parent_task_id uuid,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- Create tasks table (your to-do items)
 create table tasks (
   id uuid default gen_random_uuid() primary key,
@@ -38,14 +48,16 @@ create table tasks (
   user_id uuid references auth.users not null,
   text text not null,
   completed boolean default false,
-  is_repeating boolean default false,
   date date not null,
+  template_id uuid references task_templates(id) on delete set null,
+  parent_task_id uuid,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- Enable Row Level Security (RLS) - This keeps your data PRIVATE
 alter table sections enable row level security;
 alter table tasks enable row level security;
+alter table task_templates enable row level security;
 
 -- Users can only see their own sections
 create policy "Users can view their own sections"
@@ -79,6 +91,11 @@ create policy "Users can update their own tasks"
 
 create policy "Users can delete their own tasks"
   on tasks for delete
+  using (auth.uid() = user_id);
+
+-- Users can only see their own templates
+create policy "Users can manage their own templates"
+  on task_templates for all
   using (auth.uid() = user_id);
 
 -- Create indexes for better performance
@@ -199,6 +216,23 @@ If you want repeating tasks to automatically reset each day:
 **Tasks not syncing:**
 - Check your internet connection
 - Open browser console (F12) to see any errors
+
+
+## Step 7: Maintenance & Sync Workflow
+
+To keep your GitHub repository updated with the latest improvements from Gemini:
+
+1. **The Gemini Sync Command**: When you ask me to push changes, I will provide a command like this:
+   ```powershell
+   .\sync.bat "feat: description of changes"
+   ```
+2. **What it does**: This script automatically stages all changes, creates a commit with your message, and pushes to the `main` branch.
+
+## Troubleshooting
+
+**"Permission Denied" on Push:**
+- Ensure you have run `git remote add origin <url>`
+- Make sure you are logged into GitHub via the CLI or Git Credential Manager.
 
 **Need help?**
 - Supabase Docs: https://supabase.com/docs

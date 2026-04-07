@@ -621,6 +621,18 @@
             return estDate.toISOString().split('T')[0];
         }
 
+        // Cache Helper: Minimize Egress
+        const cache = {
+            get: (uid) => {
+                const data = localStorage.getItem(`todo_cache_${uid}`);
+                if (!data) return null;
+                const parsed = JSON.parse(data);
+                return parsed.date === getCurrentDate() ? parsed.payload : null;
+            },
+            set: (uid, payload) => localStorage.setItem(`todo_cache_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })),
+            clear: (uid) => localStorage.removeItem(`todo_cache_${uid}`)
+        };
+
         function App() {
             // If credentials are missing, show error
             if (hasDummyUrl || hasDummyKey || initError) {
@@ -660,15 +672,16 @@
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [sections, setSections] = useState([]);
+            const [archive, setArchive] = useState(null);
+            const [showArchive, setShowArchive] = useState(false);
 
             useEffect(() => {
                 checkUser();
                 
                 const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                     setUser(session?.user || null);
-                    if (session?.user) {
-                        loadSections();
-                    }
+                    if (event === 'SIGNED_OUT') cache.clear(user?.id);
+                    if (session?.user) loadSections();
                 });
 
                 return () => {
@@ -681,6 +694,8 @@
                     const { data: { session } } = await supabase.auth.getSession();
                     setUser(session?.user || null);
                     if (session?.user) {
+                        const cached = cache.get(session.user.id);
+                        if (cached) setSections(cached);
                         await handleNewDay(getCurrentDate());
                         await loadSections();
                     }
@@ -696,6 +711,9 @@
                 try {
                     const { data: { user: currentUser } } = await supabase.auth.getUser();
                     if (!currentUser) return;
+
+                    // Egress Optimization: Check if already initialized today locally
+                    if (localStorage.getItem(`last_init_${currentUser.id}`) === date) return;
 
                     const { data: existingTasks, error: checkError } = await supabase
                         .from('tasks')
@@ -751,6 +769,7 @@
                         }
                     }
 
+                    localStorage.setItem(`last_init_${currentUser.id}`, date);
                 } catch (err) {
                     console.error('Unexpected error in handleNewDay:', err);
                 }
@@ -785,10 +804,33 @@
                     }));
 
                     setSections(sectionsWithTasks);
+                    cache.set(currentUser.id, sectionsWithTasks);
                     
                 } catch (err) {
                     setError('Failed to load sections: ' + err.message);
                     console.error('Error loading sections:', err);
+                }
+            }
+
+            async function loadArchive() {
+                if (archive) { setShowArchive(!showArchive); return; }
+                try {
+                    const today = new Date();
+                    const sevenDaysAgo = new Date(today);
+                    sevenDaysAgo.setDate(today.getDate() - 7);
+                    
+                    const { data, error } = await supabase
+                        .from('tasks')
+                        .select('text, completed, date')
+                        .lt('date', getCurrentDate())
+                        .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+                        .order('date', { ascending: false });
+
+                    if (error) throw error;
+                    setArchive(data);
+                    setShowArchive(true);
+                } catch (err) {
+                    setError('Failed to load archive: ' + err.message);
                 }
             }
 
@@ -804,7 +846,18 @@
                 return <AuthScreen setError={setError} />;
             }
 
-            return <TaskApp user={user} sections={sections} setSections={setSections} setError={setError} loadSections={loadSections} />;
+            return (
+                <TaskApp 
+                    user={user} 
+                    sections={sections} 
+                    setSections={setSections} 
+                    setError={setError} 
+                    loadSections={loadSections}
+                    loadArchive={loadArchive}
+                    archive={archive}
+                    showArchive={showArchive}
+                />
+            );
         }
 
         function AuthScreen({ setError }) {
@@ -883,7 +936,7 @@
             );
         }
 
-        function TaskApp({ user, sections, setSections, setError, loadSections }) {
+        function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive }) {
             const [showNewSection, setShowNewSection] = useState(false);
             const [newSectionName, setNewSectionName] = useState('');
 
@@ -956,6 +1009,12 @@
                             >
                                 🔄 Refresh
                             </button>
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={loadArchive}
+                            >
+                                {showArchive ? 'Hide Archive' : '📜 History'}
+                            </button>
                         </div>
                         <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
                             Sign Out
@@ -987,6 +1046,20 @@
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    )}
+
+                    {showArchive && archive && (
+                        <div className="section" style={{borderLeftColor: 'var(--gold)'}}>
+                            <h2 className="section-title" style={{color: 'var(--gold)', marginBottom: '1rem'}}>Past 7 Days</h2>
+                            <ul className="task-list">
+                                {archive.map((t, i) => (
+                                    <li key={i} className="task" style={{opacity: 0.7}}>
+                                        <span style={{fontSize: '0.7rem', color: 'var(--ash)', marginRight: '1rem'}}>{t.date}</span>
+                                        <span className="task-text" style={{textDecoration: t.completed ? 'line-through' : 'none'}}>{t.text}</span>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     )}
 
