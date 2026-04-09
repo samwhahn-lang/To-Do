@@ -1,1283 +1,832 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Task System</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --noir: #0d0d0d;
-            --charcoal: #1a1a1a;
-            --slate: #2d2d2d;
-            --ash: #4a4a4a;
-            --ghost: #e8e8e8;
-            --paper: #f5f5f5;
-            --lime: #d4ff00;
-            --cyan: #00fff5;
-            --coral: #ff6b6b;
-            --gold: #ffd700;
-        }
-
-        body {
-            font-family: 'IBM Plex Mono', monospace;
-            background: var(--noir);
-            color: var(--ghost);
-            line-height: 1.6;
-            min-height: 100vh;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(212, 255, 0, 0.02) 2px,
-                    rgba(212, 255, 0, 0.02) 4px
-                );
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        #root {
-            position: relative;
-            z-index: 2;
-        }
-
-        .app-container {
-            position: relative;
-            z-index: 2;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 3rem 2rem;
-        }
-
-        .masthead {
-            margin-bottom: 4rem;
-            text-align: center;
-            position: relative;
-        }
-
-        .masthead::after {
-            content: '';
-            position: absolute;
-            bottom: -1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 2px;
-            background: var(--lime);
-            box-shadow: 0 0 20px var(--lime);
-        }
-
-        .date-header {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: clamp(2rem, 5vw, 3.5rem);
-            text-transform: uppercase;
-            letter-spacing: -0.02em;
-            background: linear-gradient(135deg, var(--lime), var(--cyan));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-            animation: glow 3s ease-in-out infinite alternate;
-        }
-
-        .tagline {
-            font-size: 0.875rem;
-            letter-spacing: 0.3em;
-            color: var(--ash);
-            text-transform: uppercase;
-        }
-
-        .control-panel {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 3rem;
-            padding: 1.5rem;
-            background: var(--charcoal);
-            border: 1px solid var(--slate);
-            border-radius: 2px;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .control-group {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            background: transparent;
-            border: 2px solid var(--lime);
-            color: var(--lime);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: var(--lime);
-            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: -1;
-        }
-
-        .btn:hover::before {
-            left: 0;
-        }
-
-        .btn:hover {
-            color: var(--noir);
-            box-shadow: 0 0 20px rgba(212, 255, 0, 0.4);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn-secondary {
-            border-color: var(--ash);
-            color: var(--ash);
-        }
-
-        .btn-secondary:hover {
-            color: var(--noir);
-        }
-
-        .section {
-            margin-bottom: 2.5rem;
-            background: var(--charcoal);
-            border-left: 4px solid var(--lime);
-            padding: 2rem;
-            position: relative;
-            animation: slideIn 0.5s ease-out backwards;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--slate);
-        }
-
-        .section-title {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            color: var(--lime);
-        }
-
-        .icon-btn {
-            width: 36px;
-            height: 36px;
-            background: transparent;
-            border: 1px solid var(--slate);
-            color: var(--ash);
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-
-        .icon-btn:hover {
-            border-color: var(--lime);
-            color: var(--lime);
-            background: rgba(212, 255, 0, 0.05);
-        }
-
-        .task-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .task {
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-            padding: 1rem;
-            background: var(--slate);
-            border: 1px solid transparent;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .task::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 3px;
-            background: var(--lime);
-            transform: scaleY(0);
-            transition: transform 0.2s;
-        }
-
-        .task:hover::before {
-            transform: scaleY(1);
-        }
-
-        .task:hover {
-            border-color: var(--lime);
-            background: rgba(212, 255, 0, 0.03);
-        }
-
-        .task.completed {
-            opacity: 0.5;
-        }
-
-        .task.completed .task-text {
-            text-decoration: line-through;
-            color: var(--ash);
-        }
-
-        .checkbox {
-            appearance: none;
-            width: 22px;
-            height: 22px;
-            border: 2px solid var(--ash);
-            background: transparent;
-            cursor: pointer;
-            position: relative;
-            flex-shrink: 0;
-            margin-top: 2px;
-            transition: all 0.2s;
-        }
-
-        .checkbox:hover {
-            border-color: var(--lime);
-        }
-
-        .checkbox:checked {
-            background: var(--lime);
-            border-color: var(--lime);
-        }
-
-        .checkbox:checked::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--noir);
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .task-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .task-text {
-            word-break: break-word;
-            color: var(--ghost);
-            font-size: 0.9375rem;
-        }
-
-        .task-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex-shrink: 0;
-        }
-
-        .badge {
-            padding: 0.25rem 0.75rem;
-            font-size: 0.6875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border: 1px solid;
-        }
-
-        .badge-daily {
-            color: var(--lime);
-            border-color: var(--lime);
-            background: rgba(212, 255, 0, 0.1);
-        }
-
-        .badge-onetime {
-            color: var(--cyan);
-            border-color: var(--cyan);
-            background: rgba(0, 255, 245, 0.1);
-        }
-
-        .add-task-form {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .task-input {
-            flex: 1;
-            min-width: 250px;
-            padding: 0.875rem;
-            background: var(--slate);
-            border: 1px solid var(--ash);
-            color: var(--ghost);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-
-        .task-input:focus {
-            outline: none;
-            border-color: var(--lime);
-            background: rgba(212, 255, 0, 0.03);
-            box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
-        }
-
-        .task-input::placeholder {
-            color: var(--ash);
-        }
-
-        .type-toggle {
-            display: flex;
-            background: var(--slate);
-            border: 1px solid var(--ash);
-        }
-
-        .type-option {
-            padding: 0.875rem 1.25rem;
-            background: transparent;
-            border: none;
-            color: var(--ash);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-right: 1px solid var(--ash);
-        }
-
-        .type-option:last-child {
-            border-right: none;
-        }
-
-        .type-option.active {
-            background: var(--lime);
-            color: var(--noir);
-        }
-
-        .type-option:not(.active):hover {
-            background: rgba(212, 255, 0, 0.1);
-            color: var(--lime);
-        }
-
-        .story-field {
-            margin-bottom: 1.5rem;
-        }
-
-        .story-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--gold);
-            font-size: 0.875rem;
-            font-weight: 600;
-            line-height: 1.5;
-        }
-
-        .story-textarea {
-            width: 100%;
-            min-height: 100px;
-            padding: 1rem;
-            background: var(--slate);
-            border: 1px solid var(--ash);
-            color: var(--ghost);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.875rem;
-            line-height: 1.6;
-            resize: vertical;
-            transition: all 0.2s;
-        }
-
-        .story-textarea:focus {
-            outline: none;
-            border-color: var(--gold);
-            background: rgba(255, 215, 0, 0.03);
-            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
-        }
-
-        .auth-screen {
-            max-width: 450px;
-            margin: 6rem auto;
-            padding: 3rem;
-            background: var(--charcoal);
-            border: 1px solid var(--slate);
-        }
-
-        .auth-title {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 2rem;
-            text-align: center;
-            margin-bottom: 2rem;
-            color: var(--lime);
-            text-transform: uppercase;
-        }
-
-        .input-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .input-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--ash);
-        }
-
-        .input-field {
-            width: 100%;
-            padding: 0.875rem;
-            background: var(--slate);
-            border: 1px solid var(--ash);
-            color: var(--ghost);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: var(--lime);
-            box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
-        }
-
-        .message {
-            padding: 1rem 1.5rem;
-            margin-bottom: 1.5rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            border-left: 4px solid;
-        }
-
-        .message-error {
-            background: rgba(255, 107, 107, 0.1);
-            border-color: var(--coral);
-            color: var(--coral);
-        }
-
-        .message-success {
-            background: rgba(212, 255, 0, 0.1);
-            border-color: var(--lime);
-            color: var(--lime);
-        }
-
-        .loading {
-            text-align: center;
-            padding: 4rem 2rem;
-            font-size: 1.25rem;
-            color: var(--ash);
-        }
-
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.4)); }
-            to { filter: drop-shadow(0 0 40px rgba(0, 255, 245, 0.6)); }
-        }
-
-        @media (max-width: 768px) {
-            .app-container {
-                padding: 2rem 1rem;
-            }
-
-            .date-header {
-                font-size: 2rem;
-            }
-
-            .control-panel {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .control-group {
-                width: 100%;
-            }
-
-            .btn {
-                flex: 1;
-            }
-
-            .task {
-                flex-wrap: wrap;
-            }
-
-            .task-meta {
-                width: 100%;
-                justify-content: space-between;
-                margin-top: 0.5rem;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Task System - BUILD 2026-04-08B</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0d; --panel: #1a1a1a; --panel2: #2d2d2d; --text: #e8e8e8;
+      --muted: #4a4a4a; --lime: #d4ff00; --cyan: #00fff5; --red: #ff6b6b; --gold: #ffd700;
+    }
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg); color: var(--text); min-height: 100vh; }
+    #root { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+    .title { text-align: center; margin-bottom: 18px; font-size: clamp(1.6rem, 4vw, 2.8rem); color: var(--lime); font-weight: 800; }
+    .tag { text-align: center; color: var(--muted); margin-bottom: 18px; font-size: 12px; letter-spacing: .12em; }
+    .panel { background: var(--panel); border-left: 4px solid var(--lime); padding: 14px; margin-bottom: 14px; }
+    .bar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--panel2); padding: 10px; }
+    .left { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { border: 1px solid var(--lime); color: var(--lime); background: transparent; padding: 8px 10px; cursor: pointer; text-transform: uppercase; font-size: 12px; font-weight: 700; }
+    .btn.gray { border-color: var(--muted); color: var(--muted); }
+    .btn:hover { background: rgba(212,255,0,.1); }
+    .in { width: 100%; padding: 10px; background: var(--panel2); color: var(--text); border: 1px solid var(--muted); }
+    .in:focus { outline: none; border-color: var(--lime); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .section-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--panel2); padding-bottom: 8px; }
+    .section-title { color: var(--lime); font-weight: 800; text-transform: uppercase; }
+    .tasks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .task { display: flex; gap: 10px; background: var(--panel2); padding: 10px; align-items: center; border: 1px solid #3a3a3a; border-radius: 8px; }
+    .task.sub { margin-left: 20px; border-left: 2px solid var(--cyan); }
+    .task.done { opacity: .55; }
+    .task-text { cursor: pointer; word-break: break-word; }
+    .task.done .task-text { text-decoration: line-through; color: var(--muted); }
+    .meta { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+    .icon {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .icon:hover { border-color: var(--lime); color: var(--lime); }
+    .badge { font-size: 10px; border: 1px solid; padding: 2px 6px; text-transform: uppercase; font-weight: 700; }
+    .b1 { color: var(--lime); border-color: var(--lime); }
+    .b2 { color: var(--cyan); border-color: var(--cyan); }
+    .error { border-left-color: var(--red); color: #ffb5b5; }
+    .auth { max-width: 460px; margin: 40px auto; background: var(--panel); border: 1px solid var(--panel2); padding: 18px; }
+    .loading { text-align: center; color: var(--muted); padding: 30px; }
+    @media (max-width: 700px) { .meta { width: 100%; justify-content: space-between; } }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        
-        // ⚠️ REPLACE THESE WITH YOUR NEW SUPABASE CREDENTIALS
-        
-        const SUPABASE_URL = 'https://dgxtslpwsayucznkrqih.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRneHRzbHB3c2F5dWN6bmtycWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NzYxMTcsImV4cCI6MjA5MTA1MjExN30.sLiEngc7B5es_jMh_u8eaJNirUScg3cGqhO9_Ku8x-I';
-        
-        // DEBUG: Check for dummy values
-        const hasDummyUrl = SUPABASE_URL.includes('YOUR-PROJECT-ID');
-        const hasDummyKey = SUPABASE_ANON_KEY.includes('YOUR-ANON-KEY');
-        
-        console.log('🚀 App initializing...');
-        console.log('Supabase URL valid?', !hasDummyUrl);
-        console.log('Supabase Key valid?', !hasDummyKey);
-        console.log('window.supabase exists?', !!window.supabase);
+  <script type="text/babel">
+    if (!window.React || !window.ReactDOM || !window.supabase) {
+      document.getElementById("root").innerHTML = '<div class="panel error">Missing required CDN scripts (React/ReactDOM/Babel/Supabase).</div>';
+      throw new Error("Library preload failure");
+    }
 
-        let supabase;
-        let initError = null;
+    const { useEffect, useRef, useState } = window.React;
+
+    const SUPABASE_URL = "https://dgxtslpwsayucznkrqih.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_DQnkByElOKvZPt6HlxmrPg_DhSHnhpN";
+
+    const memoryStorage = (() => {
+      const m = {};
+      return {
+        getItem: (k) => (k in m ? m[k] : null),
+        setItem: (k, v) => { m[k] = String(v); },
+        removeItem: (k) => { delete m[k]; }
+      };
+    })();
+
+    function getSafeStorage() {
+      try {
+        const key = "__ls_test__";
+        localStorage.setItem(key, "1");
+        localStorage.removeItem(key);
+        return localStorage;
+      } catch {
+        return memoryStorage;
+      }
+    }
+
+    const safeStorage = getSafeStorage();
+
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(label + " timed out")), ms))
+      ]);
+    }
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        storage: safeStorage
+      }
+    });
+
+    function getCurrentDate() {
+      const now = new Date();
+      const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      return est.toISOString().slice(0, 10);
+    }
+
+    const cache = {
+      get: (uid) => {
+        try {
+          const raw = safeStorage.getItem(`todo_cache_${uid}`);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return parsed.date === getCurrentDate() ? parsed.payload : null;
+        } catch { return null; }
+      },
+      set: (uid, payload) => {
+        try { safeStorage.setItem(`todo_cache_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })); } catch {}
+      },
+      clear: (uid) => { try { safeStorage.removeItem(`todo_cache_${uid}`); } catch {} }
+    };
+
+    function App() {
+      return <MainApp />;
+    }
+
+    function MainApp() {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [sections, setSections] = useState([]);
+      const [archive, setArchive] = useState(null);
+      const [showArchive, setShowArchive] = useState(false);
+      const userRef = useRef(null);
+
+      useEffect(() => { userRef.current = user; }, [user]);
+
+      useEffect(() => {
+        const failsafe = setTimeout(() => {
+          setLoading((prev) => {
+            if (prev) setError("Startup took too long. Showing login screen.");
+            return false;
+          });
+        }, 9000);
+
+        checkUser();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+          const nextUser = session?.user || null;
+          setUser(nextUser);
+
+          if (event === "SIGNED_OUT") {
+            if (userRef.current?.id) cache.clear(userRef.current.id);
+            setSections([]);
+            setArchive(null);
+            setShowArchive(false);
+            setLoading(false);
+          }
+
+          if (nextUser) {
+            handleNewDay(getCurrentDate(), nextUser.id).catch(console.error);
+            loadSections(nextUser.id, false).catch((e) => setError("Failed to load sections: " + e.message));
+          }
+        });
+
+        return () => {
+          clearTimeout(failsafe);
+          authListener?.subscription?.unsubscribe();
+        };
+      }, []);
+
+      async function checkUser() {
+        try {
+          const { data: { session } } = await withTimeout(supabase.auth.getSession(), 6000, "getSession");
+          const currentUser = session?.user || null;
+          setUser(currentUser);
+          setLoading(false);
+
+          if (!currentUser) return;
+
+          const cached = cache.get(currentUser.id);
+          if (cached) setSections(cached);
+
+          handleNewDay(getCurrentDate(), currentUser.id).catch(console.error);
+          loadSections(currentUser.id, false).catch((e) => setError("Failed to load sections: " + e.message));
+        } catch (e) {
+          setError("Auth bootstrap failed: " + e.message);
+          setUser(null);
+          setLoading(false);
+        }
+      }
+
+      async function handleNewDay(date, userId) {
+        if (!userId) return;
+        try {
+          if (safeStorage.getItem(`last_init_${userId}`) === date) return;
+
+          const { data: existing, error: checkError } = await supabase
+            .from("tasks")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("date", date)
+            .limit(1);
+          if (checkError) return;
+          if (existing && existing.length > 0) {
+            safeStorage.setItem(`last_init_${userId}`, date);
+            return;
+          }
+
+          const { data: templates, error: templateError } = await supabase
+            .from("task_templates")
+            .select("id,section_id,text,parent_task_id,order_index")
+            .eq("user_id", userId)
+            .order("order_index", { ascending: true });
+          if (templateError || !templates || templates.length === 0) {
+            safeStorage.setItem(`last_init_${userId}`, date);
+            return;
+          }
+
+          const rows = templates.map((t) => ({
+            section_id: t.section_id,
+            user_id: userId,
+            text: t.text,
+            completed: false,
+            date,
+            template_id: t.id,
+            parent_task_id: t.parent_task_id,
+            order_index: t.order_index || 0
+          }));
+          const { error: insertError } = await supabase.from("tasks").insert(rows);
+          if (insertError && insertError.code !== "23505") console.error(insertError);
+          safeStorage.setItem(`last_init_${userId}`, date);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      async function loadSections(userIdFromCall, force = false) {
+        const userId = userIdFromCall || (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) return;
+        if (!force) {
+          const cached = cache.get(userId);
+          if (cached) {
+            setSections(cached);
+            return;
+          }
+        }
+        const today = getCurrentDate();
+
+        const { data: sectionsData, error: sectionsError } = await supabase
+          .from("sections")
+          .select("id,user_id,name,order_index")
+          .eq("user_id", userId)
+          .order("order_index", { ascending: true });
+        if (sectionsError) throw sectionsError;
+
+        const { data: tasksData, error: tasksError } = await supabase
+          .from("tasks")
+          .select("id,section_id,user_id,text,completed,date,template_id,parent_task_id,order_index")
+          .eq("user_id", userId)
+          .eq("date", today)
+          .order("order_index", { ascending: true });
+        if (tasksError) throw tasksError;
+
+        const merged = (sectionsData || []).map((s) => ({
+          ...s,
+          tasks: (tasksData || []).filter((t) => t.section_id === s.id)
+        }));
+        setSections(merged);
+        cache.set(userId, merged);
+      }
+
+      async function loadArchive() {
+        if (archive) { setShowArchive(!showArchive); return; }
+        try {
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (!currentUser) return;
+          const d = new Date();
+          const start = new Date(d);
+          start.setDate(d.getDate() - 7);
+
+          const { data, error } = await supabase
+            .from("tasks")
+            .select("text,completed,date")
+            .eq("user_id", currentUser.id)
+            .lt("date", getCurrentDate())
+            .gte("date", start.toISOString().slice(0, 10))
+            .order("date", { ascending: false });
+          if (error) throw error;
+          setArchive(data || []);
+          setShowArchive(true);
+        } catch (e) {
+          setError("Failed to load archive: " + e.message);
+        }
+      }
+
+      if (loading) return <div className="loading">Loading System...</div>;
+      if (!user) return <AuthScreen setError={setError} />;
+
+      return (
+        <>
+          {error && <div className="panel error">{error}</div>}
+          <TaskApp
+            user={user}
+            sections={sections}
+            setSections={setSections}
+            setError={setError}
+            loadSections={loadSections}
+            loadArchive={loadArchive}
+            archive={archive}
+            showArchive={showArchive}
+          />
+        </>
+      );
+    }
+
+    function AuthScreen({ setError }) {
+      const [isLogin, setIsLogin] = useState(true);
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [localError, setLocalError] = useState(null);
+
+      async function handleAuth(e) {
+        e.preventDefault();
+        setLoading(true);
+        setLocalError(null);
+        try {
+          if (isLogin) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+          } else {
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) throw error;
+            alert("Check your email to confirm your account.");
+          }
+        } catch (e) {
+          setLocalError(e.message);
+          setError(e.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      return (
+        <div className="auth">
+          <h2 className="title" style={{ fontSize: "1.6rem", marginBottom: "8px" }}>{isLogin ? "Login" : "Sign Up"}</h2>
+          {localError && <div className="panel error">{localError}</div>}
+          <form onSubmit={handleAuth}>
+            <div className="input-group">
+              <label>Email</label>
+              <input className="in" type="email" required disabled={loading} value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="input-group" style={{ marginTop: "8px" }}>
+              <label>Password</label>
+              <input className="in" type="password" required disabled={loading} value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="row">
+              <button className="btn" type="submit" disabled={loading}>{loading ? "Please wait..." : (isLogin ? "Login" : "Sign Up")}</button>
+              <button className="btn gray" type="button" disabled={loading} onClick={() => setIsLogin(!isLogin)}>
+                {isLogin ? "Need an account?" : "Have an account?"}
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive }) {
+      const [showNewSection, setShowNewSection] = useState(false);
+      const [newSectionName, setNewSectionName] = useState("");
+      const todayPretty = new Date().toLocaleDateString("en-US", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/New_York"
+      });
+
+      async function addSection(e) {
+        e.preventDefault();
+        if (!newSectionName.trim()) return;
+        try {
+          const { data, error } = await supabase
+            .from("sections")
+            .insert([{ user_id: user.id, name: newSectionName.trim(), order_index: sections.length }])
+            .select();
+          if (error) throw error;
+          const next = [...sections, { ...data[0], tasks: [] }];
+          setSections(next);
+          cache.set(user.id, next);
+          setNewSectionName("");
+          setShowNewSection(false);
+        } catch (e) {
+          setError("Failed to create section: " + e.message);
+        }
+      }
+
+      async function deleteSection(sectionId) {
+        if (!confirm("Delete this section and all its tasks?")) return;
+        try {
+          const { error } = await supabase.from("sections").delete().eq("id", sectionId);
+          if (error) throw error;
+          const next = sections.filter((s) => s.id !== sectionId);
+          setSections(next);
+          cache.set(user.id, next);
+        } catch (e) {
+          setError("Failed to delete section: " + e.message);
+        }
+      }
+
+      async function moveSection(sectionId, direction) {
+        const idx = sections.findIndex((s) => s.id === sectionId);
+        const tidx = idx + direction;
+        if (idx < 0 || tidx < 0 || tidx >= sections.length) return;
+        const a = sections[idx], b = sections[tidx];
+        const aOrder = a.order_index ?? idx, bOrder = b.order_index ?? tidx;
+
+        const next = sections.map((s) => {
+          if (s.id === a.id) return { ...s, order_index: bOrder };
+          if (s.id === b.id) return { ...s, order_index: aOrder };
+          return s;
+        }).sort((x, y) => x.order_index - y.order_index);
+
+        setSections(next);
+        cache.set(user.id, next);
+        try {
+          await Promise.all([
+            supabase.from("sections").update({ order_index: bOrder }).eq("id", a.id),
+            supabase.from("sections").update({ order_index: aOrder }).eq("id", b.id)
+          ]);
+        } catch (e) {
+          setError("Failed to sync section order: " + e.message);
+        }
+      }
+
+      return (
+        <>
+          <h1 className="title">{todayPretty}</h1>
+          <div className="tag">Task Protocol | BUILD 2026-04-08B</div>
+
+          <div className="bar">
+            <div className="left">
+              <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
+              <button className="btn gray" onClick={() => loadSections(null, true)}>Refresh</button>
+              <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
+            </div>
+            <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
+          </div>
+
+          {showNewSection && (
+            <div className="panel">
+              <form onSubmit={addSection}>
+                <input className="in" type="text" placeholder="Section Name" value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} />
+                <div className="row">
+                  <button className="btn" type="submit">Create</button>
+                  <button className="btn gray" type="button" onClick={() => setShowNewSection(false)}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {showArchive && archive && (
+            <div className="panel" style={{ borderLeftColor: "var(--gold)" }}>
+              <div className="section-title" style={{ color: "var(--gold)", marginBottom: "8px" }}>Past 7 Days</div>
+              <ul className="tasks">
+                {archive.map((t, i) => (
+                  <li key={`${t.date}-${i}`} className="task" style={{ opacity: 0.75 }}>
+                    <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 80 }}>{t.date}</span>
+                    <span className="task-text" style={{ textDecoration: t.completed ? "line-through" : "none" }}>{t.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {sections.length === 0 ? (
+            <div className="panel">Welcome. Click + New Section to get started.</div>
+          ) : (
+            sections.map((section) => (
+              <div className="panel" key={section.id}>
+                <SectionComponent
+                  user={user}
+                  section={section}
+                  sections={sections}
+                  setSections={setSections}
+                  deleteSection={deleteSection}
+                  moveSection={moveSection}
+                  setError={setError}
+                />
+              </div>
+            ))
+          )}
+        </>
+      );
+    }
+
+    function SectionComponent({ user, section, sections, setSections, deleteSection, moveSection, setError }) {
+      const [tasks, setTasks] = useState(section.tasks || []);
+      const [newTaskText, setNewTaskText] = useState("");
+      const [taskType, setTaskType] = useState("daily");
+      const [isSubtaskMode, setIsSubtaskMode] = useState(false);
+      const [forcedParentTaskId, setForcedParentTaskId] = useState(null);
+      const newTaskInputRef = useRef(null);
+      const today = getCurrentDate();
+
+      useEffect(() => setTasks(section.tasks || []), [section.tasks]);
+
+      function applyTasks(nextTasks) {
+        setTasks(nextTasks);
+        const nextSections = sections.map((s) => s.id === section.id ? { ...s, tasks: nextTasks } : s);
+        setSections(nextSections);
+        cache.set(user.id, nextSections);
+      }
+
+      function reindexTasks(taskList) {
+        return taskList.map((t, i) => ({ ...t, order_index: i }));
+      }
+
+      function sameId(a, b) {
+        return String(a) === String(b);
+      }
+
+      async function persistTaskOrder(taskList) {
+        const updates = [];
+        for (const t of taskList) {
+          updates.push(supabase.from("tasks").update({ order_index: t.order_index }).eq("id", t.id));
+          if (t.template_id) {
+            updates.push(supabase.from("task_templates").update({ order_index: t.order_index }).eq("id", t.template_id));
+          }
+        }
+        await Promise.all(updates);
+      }
+
+      function isDescendantOf(candidateId, ancestorId) {
+        let current = tasks.find((t) => sameId(t.id, candidateId));
+        const seen = new Set();
+        while (current?.parent_task_id) {
+          const key = String(current.id);
+          if (seen.has(key)) break;
+          seen.add(key);
+          if (sameId(current.parent_task_id, ancestorId)) return true;
+          current = tasks.find((t) => sameId(t.id, current.parent_task_id));
+        }
+        return false;
+      }
+
+      function findInsertIndexForParent(parentId) {
+        const parentIndex = tasks.findIndex((t) => sameId(t.id, parentId));
+        if (parentIndex < 0) return tasks.length;
+        let i = parentIndex + 1;
+        while (i < tasks.length && isDescendantOf(tasks[i].id, parentId)) {
+          i += 1;
+        }
+        return i;
+      }
+
+      function startSubtaskFor(parentId) {
+        setForcedParentTaskId(parentId);
+        setIsSubtaskMode(true);
+        setTimeout(() => newTaskInputRef.current?.focus(), 0);
+      }
+
+      async function addTask(e) {
+        e.preventDefault();
+        const text = newTaskText.trim();
+        if (!text) return;
+        const last = tasks[tasks.length - 1];
+        const parentTaskId = forcedParentTaskId || (isSubtaskMode && last ? (last.parent_task_id || last.id) : null);
+        const parentTask = parentTaskId ? tasks.find((t) => sameId(t.id, parentTaskId)) : null;
+        const parentTemplateId = parentTask?.template_id || null;
+        const insertIndex = parentTaskId ? findInsertIndexForParent(parentTaskId) : tasks.length;
 
         try {
-            // FIX: Add fetch polyfill for Worker compatibility
-            const originalFetch = window.fetch;
-            
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: {
-                    autoRefreshToken: true,
-                    persistSession: true,
-                    detectSessionInUrl: true,
-                },
-                // CRITICAL FIX: Disable Web Crypto for Worker compatibility
-                global: {
-                    headers: {},
-                }
-            });
-            
-            console.log('✅ Supabase client created with Worker-safe config');
-        } catch (err) {
-            initError = err.message;
-            console.error('❌ Failed to create Supabase client:', err);
+          let createdTask = null;
+          if (taskType === "daily") {
+            const { data: tData, error: tErr } = await supabase
+              .from("task_templates")
+              .insert([{ section_id: section.id, user_id: user.id, text, parent_task_id: parentTemplateId, order_index: insertIndex }])
+              .select("id");
+            if (tErr) throw tErr;
+
+            const { data, error } = await supabase
+              .from("tasks")
+              .insert([{ section_id: section.id, user_id: user.id, text, completed: false, date: today, template_id: tData[0].id, parent_task_id: parentTaskId, order_index: insertIndex }])
+              .select();
+            if (error) throw error;
+            createdTask = data[0];
+          } else {
+            const { data, error } = await supabase
+              .from("tasks")
+              .insert([{ section_id: section.id, user_id: user.id, text, completed: false, date: today, template_id: null, parent_task_id: parentTaskId, order_index: insertIndex }])
+              .select();
+            if (error) throw error;
+            createdTask = data[0];
+          }
+          const next = [...tasks];
+          next.splice(insertIndex, 0, createdTask);
+          const normalized = reindexTasks(next);
+          applyTasks(normalized);
+          await persistTaskOrder(normalized);
+          setNewTaskText("");
+          setIsSubtaskMode(false);
+          setForcedParentTaskId(null);
+        } catch (e) {
+          setError("Failed to add task: " + e.message);
         }
+      }
 
-        // Get current date in EST timezone
-        function getCurrentDate() {
-            const now = new Date();
-            const estDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-            return estDate.toISOString().split('T')[0];
+      async function toggleTask(taskId, completed) {
+        try {
+          const { error } = await supabase.from("tasks").update({ completed }).eq("id", taskId);
+          if (error) throw error;
+          applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, completed } : t));
+        } catch (e) {
+          setError("Failed to update task: " + e.message);
         }
+      }
 
-        // Cache Helper: Minimize Egress
-        const cache = {
-            get: (uid) => {
-                const data = localStorage.getItem(`todo_cache_${uid}`);
-                if (!data) return null;
-                const parsed = JSON.parse(data);
-                return parsed.date === getCurrentDate() ? parsed.payload : null;
-            },
-            set: (uid, payload) => localStorage.setItem(`todo_cache_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })),
-            clear: (uid) => localStorage.removeItem(`todo_cache_${uid}`)
-        };
-
-        function App() {
-            // If credentials are missing, show error
-            if (hasDummyUrl || hasDummyKey || initError) {
-                return (
-                    <div className="app-container">
-                        <header className="masthead">
-                            <h1 className="date-header">⚠️ Setup Required</h1>
-                            <p className="tagline">Configuration Missing</p>
-                        </header>
-                        <div className="section" style={{borderLeftColor: 'var(--coral)'}}>
-                            <h2 style={{color: 'var(--coral)', marginBottom: '1rem'}}>Configuration Error</h2>
-                            {hasDummyUrl && (
-                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>SUPABASE_URL</strong> not updated. Replace "YOUR-PROJECT-ID" with your actual project ID.</p>
-                            )}
-                            {hasDummyKey && (
-                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>SUPABASE_ANON_KEY</strong> not updated. Replace "YOUR-ANON-KEY-HERE" with your actual anon key.</p>
-                            )}
-                            {initError && (
-                                <p style={{marginBottom: '0.5rem'}}>❌ <strong>Initialization Error:</strong> {initError}</p>
-                            )}
-                            <p style={{marginTop: '1rem', fontSize: '0.9rem', color: 'var(--ash)'}}>
-                                1. Open this HTML file in a text editor<br/>
-                                2. Find SUPABASE_URL and SUPABASE_ANON_KEY<br/>
-                                3. Replace with values from Supabase Dashboard → Settings → API<br/>
-                                4. Save and refresh
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
-
-            return <MainApp />;
+      async function deleteTask(taskId) {
+        const task = tasks.find((t) => sameId(t.id, taskId));
+        try {
+          const { error } = await supabase.from("tasks").delete().or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+          if (error) throw error;
+          if (task?.template_id) {
+            await supabase.from("task_templates").delete().or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
+          }
+          applyTasks(tasks.filter((t) => !sameId(t.id, taskId) && !sameId(t.parent_task_id, taskId)));
+        } catch (e) {
+          setError("Failed to delete task: " + e.message);
         }
+      }
 
-        function MainApp() {
-            const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-            const [sections, setSections] = useState([]);
-            const [archive, setArchive] = useState(null);
-            const [showArchive, setShowArchive] = useState(false);
+      async function updateTaskParent(taskId, parentId) {
+        const task = tasks.find((t) => sameId(t.id, taskId));
+        try {
+          if (parentId && isDescendantOf(parentId, taskId)) {
+            setError("Cannot set parent to a descendant task.");
+            return;
+          }
 
-            useEffect(() => {
-                checkUser();
-                
-                const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-                    setUser(session?.user || null);
-                    if (event === 'SIGNED_OUT') cache.clear(user?.id);
-                    if (session?.user) loadSections();
-                });
+          const { error } = await supabase.from("tasks").update({ parent_task_id: parentId }).eq("id", taskId);
+          if (error) throw error;
 
-                return () => {
-                    authListener?.subscription?.unsubscribe();
-                };
-            }, []);
-
-            async function checkUser() {
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    setUser(session?.user || null);
-                    if (session?.user) {
-                        const cached = cache.get(session.user.id);
-                        if (cached) setSections(cached);
-                        await handleNewDay(getCurrentDate());
-                        await loadSections();
-                    }
-                } catch (err) {
-                    setError('Failed to check user: ' + err.message);
-                    console.error('Error checking user:', err);
-                } finally {
-                    setLoading(false);
-                }
+          if (task?.template_id) {
+            const parentTask = parentId ? tasks.find((t) => sameId(t.id, parentId)) : null;
+            const templateParentId = parentTask?.template_id || null;
+            const { error: te } = await supabase.from("task_templates").update({ parent_task_id: templateParentId }).eq("id", task.template_id);
+            if (te) throw te;
+            if (parentId && !templateParentId) {
+              setError("Subtask set for today. Template parent was not set because selected parent is one-time.");
             }
+          }
 
-            async function handleNewDay(date) {
-                try {
-                    const { data: { user: currentUser } } = await supabase.auth.getUser();
-                    if (!currentUser) return;
-
-                    // Egress Optimization: Check if already initialized today locally
-                    if (localStorage.getItem(`last_init_${currentUser.id}`) === date) return;
-
-                    const { data: existingTasks, error: checkError } = await supabase
-                        .from('tasks')
-                        .select('id', { count: 'exact' })
-                        .eq('user_id', currentUser.id)
-                        .eq('date', date)
-                        .limit(1);
-
-                    if (checkError) {
-                        console.error('Error checking existing tasks:', checkError);
-                        return;
-                    }
-
-                    if (existingTasks && existingTasks.length > 0) {
-                        console.log('Tasks already exist for', date);
-                        return;
-                    }
-
-                    const { data: templateTasks, error: templateError } = await supabase
-                        .from('task_templates')
-                        .select('id,section_id,text,parent_task_id')
-                        .eq('user_id', currentUser.id);
-
-                    if (templateError) {
-                        console.error('Error fetching templates:', templateError);
-                        return;
-                    }
-
-                    if (!templateTasks || templateTasks.length === 0) {
-                        console.log('No templates found');
-                        return;
-                    }
-
-                    const tasksToCreate = templateTasks.map(template => ({
-                        section_id: template.section_id,
-                        user_id: currentUser.id,
-                        text: template.text,
-                        completed: false,
-                        date: date,
-                        template_id: template.id,
-                        parent_task_id: template.parent_task_id
-                    }));
-
-                    const { error: insertError } = await supabase
-                        .from('tasks')
-                        .insert(tasksToCreate);
-
-                    if (insertError) {
-                        if (insertError.code === '23505') {
-                            console.log('Tasks already created by another process');
-                        } else {
-                            console.error('Error creating tasks:', insertError);
-                        }
-                    }
-
-                    localStorage.setItem(`last_init_${currentUser.id}`, date);
-                } catch (err) {
-                    console.error('Unexpected error in handleNewDay:', err);
-                }
-            }
-
-            async function loadSections() {
-                try {
-                    const today = getCurrentDate();
-                    const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-                    const { data: sectionsData, error: sectionsError } = await supabase
-                        .from('sections')
-                        .select('id,user_id,name,order_index')
-                        .eq('user_id', currentUser.id)
-                        .order('order_index', { ascending: true });
-
-                    if (sectionsError) {
-                        setError(sectionsError.message);
-                        return;
-                    }
-
-                    const { data: tasksData } = await supabase
-                        .from('tasks')
-                        .select('id,section_id,user_id,text,completed,date,template_id,parent_task_id')
-                        .eq('user_id', currentUser.id)
-                        .eq('date', today)
-                        .order('created_at', { ascending: true });
-
-                    const sectionsWithTasks = sectionsData.map(section => ({
-                        ...section,
-                        tasks: tasksData?.filter(t => t.section_id === section.id) || []
-                    }));
-
-                    setSections(sectionsWithTasks);
-                    cache.set(currentUser.id, sectionsWithTasks);
-                    
-                } catch (err) {
-                    setError('Failed to load sections: ' + err.message);
-                    console.error('Error loading sections:', err);
-                }
-            }
-
-            async function loadArchive() {
-                if (archive) { setShowArchive(!showArchive); return; }
-                try {
-                    const today = new Date();
-                    const sevenDaysAgo = new Date(today);
-                    sevenDaysAgo.setDate(today.getDate() - 7);
-                    
-                    const { data, error } = await supabase
-                        .from('tasks')
-                        .select('text, completed, date')
-                        .lt('date', getCurrentDate())
-                        .gte('date', sevenDaysAgo.toISOString().split('T')[0])
-                        .order('date', { ascending: false });
-
-                    if (error) throw error;
-                    setArchive(data);
-                    setShowArchive(true);
-                } catch (err) {
-                    setError('Failed to load archive: ' + err.message);
-                }
-            }
-
-            if (loading) {
-                return (
-                    <div className="app-container">
-                        <div className="loading">⏳ Loading System...</div>
-                    </div>
-                );
-            }
-
-            if (!user) {
-                return <AuthScreen setError={setError} />;
-            }
-
-            return (
-                <TaskApp 
-                    user={user} 
-                    sections={sections} 
-                    setSections={setSections} 
-                    setError={setError} 
-                    loadSections={loadSections}
-                    loadArchive={loadArchive}
-                    archive={archive}
-                    showArchive={showArchive}
-                />
-            );
+          applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, parent_task_id: parentId } : t));
+        } catch (e) {
+          setError("Failed to update subtask status: " + e.message);
         }
+      }
 
-        function AuthScreen({ setError }) {
-            const [isLogin, setIsLogin] = useState(true);
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [error, setLocalError] = useState(null);
-            const [loading, setLoading] = useState(false);
+      async function moveTask(taskId, direction) {
+        const idx = tasks.findIndex((t) => sameId(t.id, taskId));
+        const targetIndex = idx + direction;
+        if (idx < 0 || targetIndex < 0 || targetIndex >= tasks.length) return;
+        const a = tasks[idx];
+        const b = tasks[targetIndex];
+        const aOrder = a.order_index ?? idx;
+        const bOrder = b.order_index ?? targetIndex;
 
-            async function handleAuth(e) {
-                e.preventDefault();
-                setLocalError(null);
-                setLoading(true);
+        const next = tasks.map((t) => {
+          if (sameId(t.id, a.id)) return { ...t, order_index: bOrder };
+          if (sameId(t.id, b.id)) return { ...t, order_index: aOrder };
+          return t;
+        }).sort((x, y) => x.order_index - y.order_index);
+        applyTasks(next);
 
-                try {
-                    if (isLogin) {
-                        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-                        if (signInError) throw signInError;
-                    } else {
-                        const { error: signUpError } = await supabase.auth.signUp({ email, password });
-                        if (signUpError) throw signUpError;
-                        alert('✅ Check your email to confirm your account!');
-                    }
-                } catch (error) {
-                    setLocalError(error.message);
-                    setError(error.message);
-                    console.error('Auth error:', error);
-                } finally {
-                    setLoading(false);
-                }
-            }
-
-            return (
-                <div className="app-container">
-                    <div className="auth-screen">
-                        <h1 className="auth-title">{isLogin ? 'Login' : 'Sign Up'}</h1>
-                        {error && <div className="message message-error">❌ {error}</div>}
-                        <form onSubmit={handleAuth}>
-                            <div className="input-group">
-                                <label className="input-label">Email</label>
-                                <input
-                                    type="email"
-                                    className="input-field"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                    disabled={loading}
-                                />
-                            </div>
-                            <div className="input-group">
-                                <label className="input-label">Password</label>
-                                <input
-                                    type="password"
-                                    className="input-field"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    disabled={loading}
-                                />
-                            </div>
-                            <button type="submit" className="btn" style={{width: '100%', marginBottom: '0.75rem'}} disabled={loading}>
-                                {loading ? '⏳ ' : ''}{isLogin ? 'Login' : 'Sign Up'}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{width: '100%'}}
-                                onClick={() => setIsLogin(!isLogin)}
-                                disabled={loading}
-                            >
-                                {isLogin ? 'Need an account?' : 'Have an account?'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            );
+        try {
+          const updates = [
+            supabase.from("tasks").update({ order_index: bOrder }).eq("id", a.id),
+            supabase.from("tasks").update({ order_index: aOrder }).eq("id", b.id)
+          ];
+          if (a.template_id) updates.push(supabase.from("task_templates").update({ order_index: bOrder }).eq("id", a.template_id));
+          if (b.template_id) updates.push(supabase.from("task_templates").update({ order_index: aOrder }).eq("id", b.template_id));
+          await Promise.all(updates);
+        } catch (e) {
+          setError("Order sync failed: " + e.message);
         }
+      }
 
-        function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive }) {
-            const [showNewSection, setShowNewSection] = useState(false);
-            const [newSectionName, setNewSectionName] = useState('');
+      async function moveTaskTo(taskId, targetIndex) {
+        const idx = tasks.findIndex((t) => sameId(t.id, taskId));
+        if (idx < 0) return;
+        if (targetIndex < 0) targetIndex = 0;
+        if (targetIndex > tasks.length - 1) targetIndex = tasks.length - 1;
+        if (targetIndex === idx) return;
 
-            const today = new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                timeZone: 'America/New_York'
-            });
+        const next = [...tasks];
+        const [moved] = next.splice(idx, 1);
+        next.splice(targetIndex, 0, moved);
+        const normalized = reindexTasks(next);
+        applyTasks(normalized);
 
-            async function addSection(e) {
-                e.preventDefault();
-                if (!newSectionName.trim()) return;
-
-                try {
-                    const { data, error } = await supabase
-                        .from('sections')
-                        .insert([{
-                            user_id: user.id,
-                            name: newSectionName,
-                            order_index: sections.length
-                        }])
-                        .select();
-
-                    if (error) throw error;
-
-                    setSections([...sections, { ...data[0], tasks: [] }]);
-                    setNewSectionName('');
-                    setShowNewSection(false);
-                } catch (err) {
-                    setError('Failed to create section: ' + err.message);
-                    console.error('Error adding section:', err);
-                }
-            }
-
-            async function deleteSection(sectionId) {
-                if (!confirm('Delete this section and all its tasks?')) return;
-
-                try {
-                    const { error } = await supabase
-                        .from('sections')
-                        .delete()
-                        .eq('id', sectionId);
-
-                    if (error) throw error;
-
-                    setSections(sections.filter(s => s.id !== sectionId));
-                } catch (err) {
-                    setError('Failed to delete section: ' + err.message);
-                }
-            }
-
-            return (
-                <div className="app-container">
-                    <header className="masthead">
-                        <h1 className="date-header">{today}</h1>
-                        <p className="tagline">Task Protocol</p>
-                    </header>
-
-                    <div className="control-panel">
-                        <div className="control-group">
-                            <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>
-                                + New Section
-                            </button>
-                            <button 
-                                className="btn btn-secondary"
-                                onClick={loadSections}
-                                title="Refresh data"
-                            >
-                                🔄 Refresh
-                            </button>
-                            <button 
-                                className="btn btn-secondary"
-                                onClick={loadArchive}
-                            >
-                                {showArchive ? 'Hide Archive' : '📜 History'}
-                            </button>
-                        </div>
-                        <button className="btn btn-secondary" onClick={() => supabase.auth.signOut()}>
-                            Sign Out
-                        </button>
-                    </div>
-
-                    {showNewSection && (
-                        <div className="section" style={{marginBottom: '2.5rem'}}>
-                            <form onSubmit={addSection}>
-                                <div className="input-group">
-                                    <label className="input-label">Section Name</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={newSectionName}
-                                        onChange={(e) => setNewSectionName(e.target.value)}
-                                        placeholder="e.g., Work, Personal, Health"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div style={{display: 'flex', gap: '0.75rem', marginTop: '1rem'}}>
-                                    <button type="submit" className="btn">Create</button>
-                                    <button 
-                                        type="button" 
-                                        className="btn btn-secondary"
-                                        onClick={() => setShowNewSection(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
-                    {showArchive && archive && (
-                        <div className="section" style={{borderLeftColor: 'var(--gold)'}}>
-                            <h2 className="section-title" style={{color: 'var(--gold)', marginBottom: '1rem'}}>Past 7 Days</h2>
-                            <ul className="task-list">
-                                {archive.map((t, i) => (
-                                    <li key={i} className="task" style={{opacity: 0.7}}>
-                                        <span style={{fontSize: '0.7rem', color: 'var(--ash)', marginRight: '1rem'}}>{t.date}</span>
-                                        <span className="task-text" style={{textDecoration: t.completed ? 'line-through' : 'none'}}>{t.text}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {sections.length === 0 ? (
-                        <div className="section">
-                            <p style={{color: 'var(--ash)'}}>
-                                👋 Welcome! Click "+ New Section" to get started. Your data is secure and private.
-                            </p>
-                        </div>
-                    ) : (
-                        sections.map((section, index) => (
-                            <div 
-                                key={section.id} 
-                                className="section"
-                                style={{animationDelay: `${index * 0.1}s`}}
-                            >
-                                <SectionComponent
-                                    user={user}
-                                    section={section}
-                                    setSections={setSections}
-                                    sections={sections}
-                                    deleteSection={deleteSection}
-                                    setError={setError}
-                                />
-                            </div>
-                        ))
-                    )}
-                </div>
-            );
+        try {
+          await persistTaskOrder(normalized);
+        } catch (e) {
+          setError("Order sync failed: " + e.message);
         }
+      }
 
-        function SectionComponent({ user, section, setSections, sections, deleteSection, setError }) {
-            const [tasks, setTasks] = useState(section.tasks || []);
-            const [newTaskText, setNewTaskText] = useState('');
-            const [taskType, setTaskType] = useState('daily');
-
-            useEffect(() => {
-                setTasks(section.tasks || []);
-            }, [section.tasks]);
-
-            const today = getCurrentDate();
-
-            async function addTask(e) {
-                e.preventDefault();
-                if (!newTaskText.trim()) return;
-
-                try {
-                    if (taskType === 'daily') {
-                        // Create template
-                        const { data: templateData, error: templateError } = await supabase
-                            .from('task_templates')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                parent_task_id: null
-                            }])
-                            .select('id');
-
-                        if (templateError) throw templateError;
-
-                        // Create today's instance
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: templateData[0].id,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) throw error;
-                        
-                        setTasks([...tasks, data[0]]);
-                    } else {
-                        // One-time task
-                        const { data, error } = await supabase
-                            .from('tasks')
-                            .insert([{
-                                section_id: section.id,
-                                user_id: user.id,
-                                text: newTaskText,
-                                completed: false,
-                                date: today,
-                                template_id: null,
-                                parent_task_id: null
-                            }])
-                            .select();
-
-                        if (error) throw error;
-                        
-                        setTasks([...tasks, data[0]]);
-                    }
-
-                    setNewTaskText('');
-                } catch (err) {
-                    setError('Failed to add task: ' + err.message);
-                    console.error('Error adding task:', err);
-                }
-            }
-
-            async function toggleTask(taskId, completed) {
-                try {
-                    const { error } = await supabase
-                        .from('tasks')
-                        .update({ completed })
-                        .eq('id', taskId);
-
-                    if (error) throw error;
-                    
-                    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed } : t));
-                } catch (err) {
-                    setError('Failed to update task: ' + err.message);
-                }
-            }
-
-            async function deleteTask(taskId) {
-                const task = tasks.find(t => t.id === taskId);
-                
-                try {
-                    const { error } = await supabase
-                        .from('tasks')
-                        .delete()
-                        .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
-
-                    if (error) throw error;
-
-                    if (task?.template_id) {
-                        await supabase
-                            .from('task_templates')
-                            .delete()
-                            .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
-                    }
-
-                    setTasks(tasks.filter(t => t.id !== taskId && t.parent_task_id !== taskId));
-                } catch (err) {
-                    setError('Failed to delete task: ' + err.message);
-                }
-            }
-
-            return (
-                <>
-                    <div className="section-header">
-                        <h2 className="section-title">{section.name}</h2>
-                        <div>
-                            <button 
-                                className="icon-btn"
-                                onClick={() => deleteSection(section.id)}
-                                title="Delete section"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-
-                    <ul className="task-list">
-                        {tasks.filter(t => !t.parent_task_id).map(task => (
-                            <li key={task.id} className={`task ${task.completed ? 'completed' : ''}`}>
-                                <input
-                                    type="checkbox"
-                                    className="checkbox"
-                                    checked={task.completed}
-                                    onChange={(e) => toggleTask(task.id, e.target.checked)}
-                                />
-                                <div className="task-content">
-                                    <span className="task-text">{task.text}</span>
-                                </div>
-                                <div className="task-meta">
-                                    <span className={task.template_id ? 'badge badge-daily' : 'badge badge-onetime'}>
-                                        {task.template_id ? 'Daily' : 'One-Time'}
-                                    </span>
-                                    <button 
-                                        className="icon-btn"
-                                        onClick={() => deleteTask(task.id)}
-                                        title="Delete task"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <form className="add-task-form" onSubmit={addTask}>
-                        <input
-                            type="text"
-                            className="task-input"
-                            value={newTaskText}
-                            onChange={(e) => setNewTaskText(e.target.value)}
-                            placeholder="Add new task..."
-                        />
-                        <div className="type-toggle">
-                            <button
-                                type="button"
-                                className={`type-option ${taskType === 'daily' ? 'active' : ''}`}
-                                onClick={() => setTaskType('daily')}
-                            >
-                                Daily
-                            </button>
-                            <button
-                                type="button"
-                                className={`type-option ${taskType === 'one-time' ? 'active' : ''}`}
-                                onClick={() => setTaskType('one-time')}
-                            >
-                                One-Time
-                            </button>
-                        </div>
-                        <button type="submit" className="btn">Add</button>
-                    </form>
-                </>
-            );
+      async function updateTaskText(taskId, newText) {
+        const text = newText.trim();
+        if (!text) return;
+        try {
+          const { error } = await supabase.from("tasks").update({ text }).eq("id", taskId);
+          if (error) throw error;
+          const task = tasks.find((t) => sameId(t.id, taskId));
+          if (task?.template_id) {
+            const { error: te } = await supabase.from("task_templates").update({ text }).eq("id", task.template_id);
+            if (te) throw te;
+          }
+          applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, text } : t));
+        } catch (e) {
+          setError("Update failed: " + e.message);
         }
+      }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+      return (
+        <>
+          <div className="section-head">
+            <div className="section-title">{section.name}</div>
+            <div className="meta">
+              <button className="icon" onClick={() => moveSection(section.id, -1)}>Up</button>
+              <button className="icon" onClick={() => moveSection(section.id, 1)}>Dn</button>
+              <button className="icon" onClick={() => deleteSection(section.id)}>Del</button>
+            </div>
+          </div>
+
+          <ul className="tasks">
+            {tasks.map((task, i) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                toggleTask={toggleTask}
+                deleteTask={deleteTask}
+                moveTask={moveTask}
+                updateTaskText={updateTaskText}
+                updateTaskParent={updateTaskParent}
+                startSubtaskFor={startSubtaskFor}
+              />
+            ))}
+          </ul>
+
+          <form className="row" onSubmit={addTask}>
+            <input
+              className="in"
+              ref={newTaskInputRef}
+              type="text"
+              value={newTaskText}
+              placeholder={forcedParentTaskId ? "Add subtask under selected task..." : (isSubtaskMode ? "Add as subtask..." : "Add task (Tab for subtask)...")}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab") {
+                  e.preventDefault();
+                  setIsSubtaskMode((v) => !v);
+                }
+              }}
+            />
+            <button type="button" className={`btn ${taskType === "daily" ? "" : "gray"}`} onClick={() => setTaskType("daily")}>Daily</button>
+            <button type="button" className={`btn ${taskType === "one-time" ? "" : "gray"}`} onClick={() => setTaskType("one-time")}>One-Time</button>
+            <button type="submit" className="btn">Add</button>
+          </form>
+        </>
+      );
+    }
+    function TaskItem({ task, toggleTask, deleteTask, moveTask, updateTaskText, updateTaskParent, startSubtaskFor }) {
+      const [editing, setEditing] = useState(false);
+      const [text, setText] = useState(task.text);
+
+      useEffect(() => setText(task.text), [task.text]);
+
+      function save() {
+        const trimmed = text.trim();
+        if (trimmed && trimmed !== task.text) updateTaskText(task.id, trimmed);
+        setEditing(false);
+      }
+
+      return (
+        <li className={`task ${task.completed ? "done" : ""} ${task.parent_task_id ? "sub" : ""}`}>
+          <input type="checkbox" checked={task.completed} onChange={(e) => toggleTask(task.id, e.target.checked)} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {editing ? (
+              <input
+                className="in"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") save();
+                  if (e.key === "Escape") { setText(task.text); setEditing(false); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="task-text" title="Click to edit" onClick={() => setEditing(true)}>{task.text}</span>
+            )}
+          </div>
+          <div className="meta">
+            <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>+</button>
+            <button className="icon" title="Move up" onClick={() => moveTask(task.id, -1)}>↑</button>
+            <button className="icon" title="Move down" onClick={() => moveTask(task.id, 1)}>↓</button>
+            {task.parent_task_id && (
+              <button className="icon" title="Remove parent" onClick={() => updateTaskParent(task.id, null)}>-</button>
+            )}
+            <span className={`badge ${task.template_id ? "b1" : "b2"}`}>{task.template_id ? "Daily" : "One-Time"}</span>
+            <button className="icon" title="Delete task" onClick={() => deleteTask(task.id)}>×</button>
+          </div>
+        </li>
+      );
+    }
+    const root = window.ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
 </body>
 </html>
+
+
