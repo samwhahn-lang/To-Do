@@ -4,106 +4,310 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Daily Task System</title>
+
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
-      --bg: #0d0d0d; --panel: #1a1a1a; --panel2: #2d2d2d; --text: #e8e8e8;
-      --muted: #4a4a4a; --lime: #d4ff00; --cyan: #00fff5; --red: #ff6b6b; --gold: #ffd700;
+      --bg: #0d0d0d;
+      --panel: #1a1a1a;
+      --panel2: #2d2d2d;
+      --line: #3a3a3a;
+      --text: #e8e8e8;
+      --muted: #777;
+      --lime: #d4ff00;
+      --cyan: #00fff5;
+      --red: #ff6b6b;
+      --gold: #ffd700;
     }
-    body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg); color: var(--text); min-height: 100vh; }
-    #root { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
-    .title { text-align: center; margin-bottom: 18px; font-size: clamp(1.6rem, 4vw, 2.8rem); color: var(--lime); font-weight: 800; }
-    .tag { text-align: center; color: var(--muted); margin-bottom: 18px; font-size: 12px; letter-spacing: .12em; }
-    .panel { background: var(--panel); border-left: 4px solid var(--lime); padding: 14px; margin-bottom: 14px; }
-    .bar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--panel2); padding: 10px; }
-    .left { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { border: 1px solid var(--lime); color: var(--lime); background: transparent; padding: 8px 10px; cursor: pointer; text-transform: uppercase; font-size: 12px; font-weight: 700; }
-    .btn.gray { border-color: var(--muted); color: var(--muted); }
-    .btn:hover { background: rgba(212,255,0,.1); }
-    .in { width: 100%; padding: 10px; background: var(--panel2); color: var(--text); border: 1px solid var(--muted); }
-    .in:focus { outline: none; border-color: var(--lime); }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .section-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--panel2); padding-bottom: 8px; }
-    .section-title { color: var(--lime); font-weight: 800; text-transform: uppercase; }
-    .tasks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-    .task { display: flex; gap: 10px; background: var(--panel2); padding: 10px; align-items: flex-start; border: 1px solid #3a3a3a; border-radius: 8px; }
-    .task.sub { margin-left: 20px; border-left: 2px solid var(--cyan); }
-    .task.done { opacity: .55; }
-    .task-text { cursor: pointer; word-break: break-word; }
-    .task.done .task-text { text-decoration: line-through; color: var(--muted); }
-    .meta { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-    .icon {
-      width: 30px;
-      height: 30px;
-      border: 1px solid var(--muted);
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      min-height: 100vh;
+    }
+
+    #root {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .title {
+      color: var(--lime);
+      font-size: clamp(1.6rem, 4vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 10px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .tag {
       color: var(--muted);
-      background: transparent;
-      cursor: pointer;
-      border-radius: 6px;
-      font-weight: 700;
-      line-height: 1;
+      font-size: 12px;
+      letter-spacing: .12em;
+      margin-bottom: 18px;
+      text-align: center;
+      text-transform: uppercase;
     }
-    .icon:hover { border-color: var(--lime); color: var(--lime); }
-    .badge { font-size: 10px; border: 1px solid; padding: 2px 6px; text-transform: uppercase; font-weight: 700; }
-    .b1 { color: var(--lime); border-color: var(--lime); }
-    .b2 { color: var(--cyan); border-color: var(--cyan); }
-    .error { border-left-color: var(--red); color: #ffb5b5; }
-    .auth { max-width: 460px; margin: 40px auto; background: var(--panel); border: 1px solid var(--panel2); padding: 18px; }
-    .loading { text-align: center; color: var(--muted); padding: 30px; }
-    .subtask-form { margin: 8px 0 8px 24px; }
+
+    .panel {
+      background: var(--panel);
+      border-left: 4px solid var(--lime);
+      margin-bottom: 14px;
+      padding: 14px;
+    }
+
+    .panel.error {
+      border-left-color: var(--red);
+      color: #ffb5b5;
+    }
+
+    .panel.gold {
+      border-left-color: var(--gold);
+    }
+
+    .bar {
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--panel2);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding: 10px;
+    }
+
+    .left {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid var(--lime);
+      color: var(--lime);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 10px;
+      text-transform: uppercase;
+    }
+
+    .btn.gray {
+      border-color: var(--muted);
+      color: var(--muted);
+    }
+
+    .btn:hover {
+      background: rgba(212,255,0,.1);
+    }
+
+    .in {
+      background: var(--panel2);
+      border: 1px solid var(--muted);
+      color: var(--text);
+      flex: 1;
+      font-family: inherit;
+      min-width: 180px;
+      padding: 10px;
+      width: 100%;
+    }
+
+    .in:focus {
+      border-color: var(--lime);
+      outline: none;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .section-head {
+      align-items: center;
+      border-bottom: 1px solid var(--panel2);
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+    }
+
+    .section-title {
+      color: var(--lime);
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .task {
+      align-items: flex-start;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .task.sub {
+      border-left: 2px solid var(--cyan);
+      margin-left: 20px;
+    }
+
+    .task.done {
+      opacity: .55;
+    }
+
+    .task.done .task-text {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .task-text {
+      cursor: pointer;
+      word-break: break-word;
+    }
+
+    .meta {
+      align-items: center;
+      display: flex;
+      flex-shrink: 0;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .icon {
+      background: transparent;
+      border: 1px solid var(--muted);
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+      height: 30px;
+      line-height: 1;
+      width: 30px;
+    }
+
+    .icon:hover {
+      border-color: var(--lime);
+      color: var(--lime);
+    }
+
+    .badge {
+      border: 1px solid;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .b1 { border-color: var(--lime); color: var(--lime); }
+    .b2 { border-color: var(--cyan); color: var(--cyan); }
+    .b3 { border-color: var(--gold); color: var(--gold); }
+
+    .auth {
+      background: var(--panel);
+      border: 1px solid var(--panel2);
+      margin: 40px auto;
+      max-width: 460px;
+      padding: 18px;
+    }
+
+    .loading {
+      color: var(--muted);
+      padding: 30px;
+      text-align: center;
+    }
+
+    .subtask-form {
+      margin: 8px 0 8px 24px;
+    }
+
+    .history-day {
+      margin-bottom: 14px;
+    }
+
+    .history-date {
+      color: var(--gold);
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
 
     @media (max-width: 700px) {
+      #root { padding: 14px 8px; }
+
       .task {
-        flex-wrap: nowrap;
         align-items: flex-start;
         min-height: 56px;
         padding: 10px 8px;
       }
+
       .task > div[style] {
         min-width: 0;
       }
+
       .task-text {
         display: block;
+        line-height: 1.35;
         white-space: normal;
-        overflow: visible;
-        text-overflow: clip;
-        line-height: 1.3;
       }
+
       .meta {
-        width: auto;
-        margin-left: auto;
         flex-wrap: nowrap;
         gap: 4px;
-        flex-shrink: 0;
       }
+
       .icon {
-        width: 28px;
-        height: 28px;
         border-radius: 5px;
         font-size: 13px;
+        height: 28px;
+        width: 28px;
       }
+
       .badge {
-        padding: 2px 5px;
-        font-size: 9px;
         display: inline-block;
+        font-size: 9px;
+        padding: 2px 5px;
       }
+
       .task.sub {
         margin-left: 8px;
       }
-      .subtask-form { margin-left: 10px; }
+
+      .subtask-form {
+        margin-left: 10px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
     if (!window.React || !window.ReactDOM || !window.supabase) {
-      document.getElementById("root").innerHTML = '<div class="panel error">Missing required CDN scripts (React/ReactDOM/Babel/Supabase).</div>';
+      document.getElementById("root").innerHTML =
+        '<div class="panel error">Missing required CDN scripts. Check React, Babel, and Supabase script loading.</div>';
       throw new Error("Library preload failure");
     }
 
@@ -124,9 +328,9 @@
     function getSafeStorage() {
       try {
         const key = "__ls_test__";
-        localStorage.setItem(key, "1");
-        localStorage.removeItem(key);
-        return localStorage;
+        window.localStorage.setItem(key, "1");
+        window.localStorage.removeItem(key);
+        return window.localStorage;
       } catch {
         return memoryStorage;
       }
@@ -143,58 +347,74 @@
       }
     });
 
-    function getCurrentDate() {
+    function nyDateFrom(baseDate) {
       const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: "America/New_York",
         year: "numeric",
         month: "2-digit",
         day: "2-digit"
-      }).formatToParts(new Date());
+      }).formatToParts(baseDate);
+
       const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
       return `${byType.year}-${byType.month}-${byType.day}`;
+    }
+
+    function getCurrentDate() {
+      return nyDateFrom(new Date());
     }
 
     function getDateDaysAgo(daysAgo) {
       const d = new Date();
       d.setDate(d.getDate() - daysAgo);
-      const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/New_York",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-      }).formatToParts(d);
-      const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-      return `${byType.year}-${byType.month}-${byType.day}`;
+      return nyDateFrom(d);
     }
 
     const cache = {
-      get: (uid) => {
+      get(uid) {
         try {
           const raw = safeStorage.getItem(`todo_cache_${uid}`);
           if (!raw) return null;
           const parsed = JSON.parse(raw);
           return parsed.date === getCurrentDate() ? parsed.payload : null;
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       },
-      set: (uid, payload) => {
-        try { safeStorage.setItem(`todo_cache_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })); } catch {}
+      set(uid, payload) {
+        try {
+          safeStorage.setItem(`todo_cache_${uid}`, JSON.stringify({
+            date: getCurrentDate(),
+            payload
+          }));
+        } catch {}
       },
-      clear: (uid) => { try { safeStorage.removeItem(`todo_cache_${uid}`); } catch {} }
+      clear(uid) {
+        try { safeStorage.removeItem(`todo_cache_${uid}`); } catch {}
+      }
     };
 
     const historyCache = {
-      get: (uid) => {
+      get(uid) {
         try {
-          const raw = safeStorage.getItem(`todo_history_v2_${uid}`);
+          const raw = safeStorage.getItem(`todo_history_v3_${uid}`);
           if (!raw) return null;
           const parsed = JSON.parse(raw);
           return parsed.date === getCurrentDate() ? parsed.payload : null;
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       },
-      set: (uid, payload) => {
-        try { safeStorage.setItem(`todo_history_v2_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })); } catch {}
+      set(uid, payload) {
+        try {
+          safeStorage.setItem(`todo_history_v3_${uid}`, JSON.stringify({
+            date: getCurrentDate(),
+            payload
+          }));
+        } catch {}
       },
-      clear: (uid) => { try { safeStorage.removeItem(`todo_history_v2_${uid}`); } catch {} }
+      clear(uid) {
+        try { safeStorage.removeItem(`todo_history_v3_${uid}`); } catch {}
+      }
     };
 
     function App() {
@@ -212,12 +432,14 @@
       const userRef = useRef(null);
       const dateRef = useRef(getCurrentDate());
 
-      useEffect(() => { userRef.current = user; }, [user]);
+      useEffect(() => {
+        userRef.current = user;
+      }, [user]);
 
       useEffect(() => {
         const failsafe = setTimeout(() => {
           setLoading((prev) => {
-            if (prev) setError("Startup took too long. Showing login screen.");
+            if (prev) setError("Startup took too long. If you are signed in, press Refresh.");
             return false;
           });
         }, 9000);
@@ -234,17 +456,17 @@
             setArchive(null);
             setShowArchive(false);
             setLoadInfo(null);
-            setLoading(false);
+            return;
           }
 
           if (nextUser) {
             try {
               const cached = cache.get(nextUser.id);
               if (cached) setSections(cached);
-              await handleNewDay(getCurrentDate(), nextUser.id);
+              await ensureDailyTasks(getCurrentDate(), nextUser.id);
               await loadSections(nextUser.id, true);
             } catch (e) {
-              setError("Failed to load sections: " + e.message);
+              setError("Failed to load tasks: " + e.message);
             }
           }
         });
@@ -252,13 +474,15 @@
         const midnightWatcher = setInterval(async () => {
           const currentDate = getCurrentDate();
           if (currentDate === dateRef.current) return;
+
           dateRef.current = currentDate;
           const uid = userRef.current?.id;
           if (!uid) return;
+
           try {
             cache.clear(uid);
             historyCache.clear(uid);
-            await handleNewDay(currentDate, uid);
+            await ensureDailyTasks(currentDate, uid);
             await loadSections(uid, true);
             setArchive(null);
           } catch (e) {
@@ -273,94 +497,113 @@
         };
       }, []);
 
-      async function handleNewDay(date, userId) {
+      async function ensureDailyTasks(date, userId) {
         if (!userId) return;
-        try {
-          if (safeStorage.getItem(`last_init_${userId}`) === date) return;
 
-          const { data: existing, error: checkError } = await supabase
-            .from("tasks")
-            .select("id")
-            .eq("user_id", userId)
-            .eq("date", date)
-            .limit(1);
-          if (checkError) return;
-          if (existing && existing.length > 0) {
-            safeStorage.setItem(`last_init_${userId}`, date);
-            return;
-          }
+        const { data: templates, error: templateError } = await supabase
+          .from("task_templates")
+          .select("id,section_id,text,parent_task_id,order_index")
+          .eq("user_id", userId)
+          .order("order_index", { ascending: true });
 
-          const { data: templates, error: templateError } = await supabase
-            .from("task_templates")
-            .select("id,section_id,text,parent_task_id,order_index")
-            .eq("user_id", userId)
-            .order("order_index", { ascending: true });
-          if (templateError || !templates || templates.length === 0) {
-            safeStorage.setItem(`last_init_${userId}`, date);
-            return;
-          }
+        if (templateError) throw templateError;
 
-          const rows = templates.map((t) => ({
-            section_id: t.section_id,
-            user_id: userId,
-            text: t.text,
-            completed: false,
-            date,
-            template_id: t.id,
-            parent_task_id: null,
-            order_index: t.order_index || 0
-          }));
-          const { data: createdTasks, error: insertError } = await supabase
-            .from("tasks")
-            .insert(rows)
-            .select("id,template_id");
-          if (insertError) {
-            if (insertError.code !== "23505") throw insertError;
-          } else {
-            const taskByTemplateId = {};
-            (createdTasks || []).forEach((task) => {
-              taskByTemplateId[String(task.template_id)] = task.id;
-            });
-
-            const parentUpdates = templates
-              .filter((template) => template.parent_task_id && taskByTemplateId[String(template.parent_task_id)] && taskByTemplateId[String(template.id)])
-              .map((template) => supabase
-                .from("tasks")
-                .update({ parent_task_id: taskByTemplateId[String(template.parent_task_id)] })
-                .eq("id", taskByTemplateId[String(template.id)]));
-
-            if (parentUpdates.length > 0) await Promise.all(parentUpdates);
-          }
+        if (!templates || templates.length === 0) {
           safeStorage.setItem(`last_init_${userId}`, date);
-        } catch (e) {
-          setError("Failed to create today's daily tasks: " + e.message);
-          throw e;
+          return;
         }
+
+        const { data: existingDailyTasks, error: existingError } = await supabase
+          .from("tasks")
+          .select("id,template_id")
+          .eq("user_id", userId)
+          .eq("date", date)
+          .not("template_id", "is", null);
+
+        if (existingError) throw existingError;
+
+        const existingTemplateIds = new Set(
+          (existingDailyTasks || []).map((task) => String(task.template_id))
+        );
+
+        const missingTemplates = templates.filter(
+          (template) => !existingTemplateIds.has(String(template.id))
+        );
+
+        if (missingTemplates.length === 0) {
+          safeStorage.setItem(`last_init_${userId}`, date);
+          return;
+        }
+
+        const rows = missingTemplates.map((template) => ({
+          section_id: template.section_id,
+          user_id: userId,
+          text: template.text,
+          completed: false,
+          date,
+          template_id: template.id,
+          parent_task_id: null,
+          order_index: template.order_index || 0
+        }));
+
+        const { data: createdTasks, error: insertError } = await supabase
+          .from("tasks")
+          .insert(rows)
+          .select("id,template_id");
+
+        if (insertError && insertError.code !== "23505") throw insertError;
+
+        const taskByTemplateId = {};
+        (existingDailyTasks || []).forEach((task) => {
+          taskByTemplateId[String(task.template_id)] = task.id;
+        });
+        (createdTasks || []).forEach((task) => {
+          taskByTemplateId[String(task.template_id)] = task.id;
+        });
+
+        const parentUpdates = missingTemplates
+          .filter((template) => (
+            template.parent_task_id &&
+            taskByTemplateId[String(template.parent_task_id)] &&
+            taskByTemplateId[String(template.id)]
+          ))
+          .map((template) => supabase
+            .from("tasks")
+            .update({ parent_task_id: taskByTemplateId[String(template.parent_task_id)] })
+            .eq("id", taskByTemplateId[String(template.id)]));
+
+        if (parentUpdates.length > 0) await Promise.all(parentUpdates);
+
+        safeStorage.setItem(`last_init_${userId}`, date);
       }
 
       async function loadSections(userIdFromCall, force = false) {
         const userId = userIdFromCall || userRef.current?.id;
         if (!userId) return;
+
         if (force) {
+          cache.clear(userId);
           safeStorage.removeItem(`last_init_${userId}`);
-          await handleNewDay(getCurrentDate(), userId);
+          await ensureDailyTasks(getCurrentDate(), userId);
         }
+
         if (!force) {
           const cached = cache.get(userId);
           if (cached) {
             setSections(cached);
-            const hasTasks = cached.some((s) => (s.tasks || []).length > 0);
+            const hasTasks = cached.some((section) => (section.tasks || []).length > 0);
             if (hasTasks) return;
           }
         }
+
         const today = getCurrentDate();
-        let activeDate = today;
 
         const { data: sectionsData, error: sectionsError } = await supabase
           .from("sections")
           .select("id,user_id,name,order_index")
           .eq("user_id", userId)
           .order("order_index", { ascending: true });
+
         if (sectionsError) throw sectionsError;
 
         const { data: tasksData, error: tasksError } = await supabase
@@ -369,30 +612,19 @@
           .eq("user_id", userId)
           .eq("date", today)
           .order("order_index", { ascending: true });
+
         if (tasksError) throw tasksError;
 
-        let effectiveTasks = tasksData || [];
-        if (effectiveTasks.length === 0) {
-          const { data: recentTasks, error: recentError } = await supabase
-            .from("tasks")
-            .select("id,section_id,user_id,text,completed,date,template_id,parent_task_id,order_index")
-            .eq("user_id", userId)
-            .gte("date", getDateDaysAgo(7))
-            .order("date", { ascending: false })
-            .order("order_index", { ascending: true });
-          if (recentError) throw recentError;
-          if (recentTasks && recentTasks.length > 0) {
-            activeDate = recentTasks[0].date;
-            effectiveTasks = recentTasks.filter((task) => task.date === activeDate);
-          }
-        }
+        const effectiveTasks = tasksData || [];
 
-        const merged = (sectionsData || []).map((s) => ({
-          ...s,
-          tasks: effectiveTasks.filter((t) => String(t.section_id) === String(s.id))
+        let merged = (sectionsData || []).map((section) => ({
+          ...section,
+          tasks: effectiveTasks.filter((task) => String(task.section_id) === String(section.id))
         }));
-        const knownSectionIds = new Set((sectionsData || []).map((s) => String(s.id)));
-        const orphanTasks = effectiveTasks.filter((t) => !knownSectionIds.has(String(t.section_id)));
+
+        const knownSectionIds = new Set((sectionsData || []).map((section) => String(section.id)));
+        const orphanTasks = effectiveTasks.filter((task) => !knownSectionIds.has(String(task.section_id)));
+
         if (orphanTasks.length > 0) {
           merged.push({
             id: "unsectioned",
@@ -402,42 +634,59 @@
             tasks: orphanTasks
           });
         }
+
+        if (effectiveTasks.length > 0 && merged.every((section) => (section.tasks || []).length === 0)) {
+          merged = [{
+            id: "all-tasks",
+            user_id: userId,
+            name: "Tasks",
+            order_index: Number.MAX_SAFE_INTEGER,
+            tasks: effectiveTasks
+          }];
+        }
+
         setSections(merged);
         cache.set(userId, merged);
-        const taskCount = effectiveTasks.length;
+
         setLoadInfo({
           today,
-          activeDate,
-          taskCount,
+          taskCount: effectiveTasks.length,
           sectionCount: (sectionsData || []).length,
-          usedFallbackDate: activeDate !== today
+          templateBackedCount: effectiveTasks.filter((task) => task.template_id).length
         });
       }
 
       async function loadArchive() {
-        if (archive) { setShowArchive(!showArchive); return; }
+        if (archive) {
+          setShowArchive(!showArchive);
+          return;
+        }
+
         try {
           const currentUser = userRef.current;
           if (!currentUser) {
             setError("History is available after sign in.");
             return;
           }
+
           const cached = historyCache.get(currentUser.id);
           if (cached) {
             setArchive(cached);
             setShowArchive(true);
             return;
           }
-          const startDate = getDateDaysAgo(7);
 
           const { data, error } = await supabase
             .from("tasks")
             .select("text,completed,date,template_id,section_id,sections(name)")
             .eq("user_id", currentUser.id)
             .lte("date", getCurrentDate())
-            .gte("date", startDate)
-            .order("date", { ascending: false });
+            .gte("date", getDateDaysAgo(7))
+            .order("date", { ascending: false })
+            .order("order_index", { ascending: true });
+
           if (error) throw error;
+
           setArchive(data || []);
           historyCache.set(currentUser.id, data || []);
           setShowArchive(true);
@@ -478,6 +727,7 @@
         e.preventDefault();
         setLoading(true);
         setLocalError(null);
+
         try {
           if (isLogin) {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -497,20 +747,47 @@
 
       return (
         <div className="auth">
-          <h2 className="title" style={{ fontSize: "1.6rem", marginBottom: "8px" }}>{isLogin ? "Login" : "Sign Up"}</h2>
+          <h2 className="title" style={{ fontSize: "1.6rem", marginBottom: "8px" }}>
+            {isLogin ? "Login" : "Sign Up"}
+          </h2>
+
           {localError && <div className="panel error">{localError}</div>}
+
           <form onSubmit={handleAuth}>
-            <div className="input-group">
+            <div>
               <label>Email</label>
-              <input className="in" type="email" required disabled={loading} value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input
+                className="in"
+                type="email"
+                required
+                disabled={loading}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-            <div className="input-group" style={{ marginTop: "8px" }}>
+
+            <div style={{ marginTop: "8px" }}>
               <label>Password</label>
-              <input className="in" type="password" required disabled={loading} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input
+                className="in"
+                type="password"
+                required
+                disabled={loading}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
+
             <div className="row">
-              <button className="btn" type="submit" disabled={loading}>{loading ? "Please wait..." : (isLogin ? "Login" : "Sign Up")}</button>
-              <button className="btn gray" type="button" disabled={loading} onClick={() => setIsLogin(!isLogin)}>
+              <button className="btn" type="submit" disabled={loading}>
+                {loading ? "Please wait..." : (isLogin ? "Login" : "Sign Up")}
+              </button>
+              <button
+                className="btn gray"
+                type="button"
+                disabled={loading}
+                onClick={() => setIsLogin(!isLogin)}
+              >
                 {isLogin ? "Need an account?" : "Have an account?"}
               </button>
             </div>
@@ -522,10 +799,17 @@
     function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
+
       const todayPretty = new Date().toLocaleDateString("en-US", {
-        weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/New_York"
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "America/New_York"
       });
-      const totalTasksToday = sections.reduce((sum, s) => sum + (s.tasks?.length || 0), 0);
+
+      const totalTasksToday = sections.reduce((sum, section) => sum + (section.tasks?.length || 0), 0);
+
       const groupedArchive = (archive || []).reduce((acc, item) => {
         if (!acc[item.date]) acc[item.date] = [];
         acc[item.date].push(item);
@@ -535,12 +819,15 @@
       async function addSection(e) {
         e.preventDefault();
         if (!newSectionName.trim()) return;
+
         try {
           const { data, error } = await supabase
             .from("sections")
             .insert([{ user_id: user.id, name: newSectionName.trim(), order_index: sections.length }])
             .select();
+
           if (error) throw error;
+
           const next = [...sections, { ...data[0], tasks: [] }];
           setSections(next);
           cache.set(user.id, next);
@@ -553,10 +840,12 @@
 
       async function deleteSection(sectionId) {
         if (!confirm("Delete this section and all its tasks?")) return;
+
         try {
           const { error } = await supabase.from("sections").delete().eq("id", sectionId);
           if (error) throw error;
-          const next = sections.filter((s) => s.id !== sectionId);
+
+          const next = sections.filter((section) => section.id !== sectionId);
           setSections(next);
           cache.set(user.id, next);
         } catch (e) {
@@ -565,20 +854,25 @@
       }
 
       async function moveSection(sectionId, direction) {
-        const idx = sections.findIndex((s) => s.id === sectionId);
-        const tidx = idx + direction;
-        if (idx < 0 || tidx < 0 || tidx >= sections.length) return;
-        const a = sections[idx], b = sections[tidx];
-        const aOrder = a.order_index ?? idx, bOrder = b.order_index ?? tidx;
+        const index = sections.findIndex((section) => section.id === sectionId);
+        const targetIndex = index + direction;
+        if (index < 0 || targetIndex < 0 || targetIndex >= sections.length) return;
 
-        const next = sections.map((s) => {
-          if (s.id === a.id) return { ...s, order_index: bOrder };
-          if (s.id === b.id) return { ...s, order_index: aOrder };
-          return s;
+        const a = sections[index];
+        const b = sections[targetIndex];
+
+        const aOrder = a.order_index ?? index;
+        const bOrder = b.order_index ?? targetIndex;
+
+        const next = sections.map((section) => {
+          if (section.id === a.id) return { ...section, order_index: bOrder };
+          if (section.id === b.id) return { ...section, order_index: aOrder };
+          return section;
         }).sort((x, y) => x.order_index - y.order_index);
 
         setSections(next);
         cache.set(user.id, next);
+
         try {
           await Promise.all([
             supabase.from("sections").update({ order_index: bOrder }).eq("id", a.id),
@@ -606,7 +900,13 @@
           {showNewSection && (
             <div className="panel">
               <form onSubmit={addSection}>
-                <input className="in" type="text" placeholder="Section Name" value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} />
+                <input
+                  className="in"
+                  type="text"
+                  placeholder="Section Name"
+                  value={newSectionName}
+                  onChange={(e) => setNewSectionName(e.target.value)}
+                />
                 <div className="row">
                   <button className="btn" type="submit">Create</button>
                   <button className="btn gray" type="button" onClick={() => setShowNewSection(false)}>Cancel</button>
@@ -616,22 +916,31 @@
           )}
 
           {showArchive && archive && (
-            <div className="panel" style={{ borderLeftColor: "var(--gold)" }}>
-              <div className="section-title" style={{ color: "var(--gold)", marginBottom: "8px" }}>History by Day (Last 7 Days)</div>
+            <div className="panel gold">
+              <div className="section-title" style={{ color: "var(--gold)", marginBottom: "8px" }}>
+                History by Day (Last 7 Days)
+              </div>
+
               {Object.keys(groupedArchive).length === 0 ? (
                 <div style={{ color: "var(--muted)" }}>No history for the last 7 days.</div>
               ) : (
                 Object.entries(groupedArchive).map(([day, items]) => (
-                  <div key={day} style={{ marginBottom: "10px" }}>
-                    <div style={{ color: "var(--gold)", fontWeight: 700, marginBottom: "4px" }}>{day}</div>
+                  <div className="history-day" key={day}>
+                    <div className="history-date">{day}</div>
                     <ul className="tasks">
-                      {items.map((t, i) => (
-                        <li key={`${day}-${i}`} className="task" style={{ opacity: 0.85 }}>
-                          <span className="task-text" style={{ textDecoration: t.completed ? "line-through" : "none" }}>{t.text}</span>
+                      {items.map((task, index) => (
+                        <li key={`${day}-${index}`} className="task" style={{ opacity: 0.85 }}>
+                          <span className="task-text" style={{ textDecoration: task.completed ? "line-through" : "none" }}>
+                            {task.text}
+                          </span>
                           <div className="meta">
-                            <span className="badge b2">{t.sections?.name || "No Section"}</span>
-                            <span className={`badge ${t.template_id ? "b1" : "b2"}`}>{t.template_id ? "Daily" : "One-Time"}</span>
-                            <span className={`badge ${t.completed ? "b1" : "b2"}`}>{t.completed ? "Done" : "Open"}</span>
+                            <span className="badge b2">{task.sections?.name || "No Section"}</span>
+                            <span className={`badge ${task.template_id ? "b1" : "b2"}`}>
+                              {task.template_id ? "Daily" : "One-Time"}
+                            </span>
+                            <span className={`badge ${task.completed ? "b1" : "b3"}`}>
+                              {task.completed ? "Done" : "Open"}
+                            </span>
                           </div>
                         </li>
                       ))}
@@ -643,16 +952,20 @@
           )}
 
           {loadInfo && (
-            <div className={`panel ${loadInfo.usedFallbackDate || loadInfo.taskCount === 0 ? "error" : ""}`}>
-              Loaded {loadInfo.taskCount} task{loadInfo.taskCount === 1 ? "" : "s"} from {loadInfo.activeDate}.
-              {loadInfo.usedFallbackDate && ` No rows were returned for ${loadInfo.today}, so the app is showing the latest day with tasks.`}
+            <div className={`panel ${loadInfo.taskCount === 0 ? "error" : ""}`}>
+              Loaded {loadInfo.taskCount} task{loadInfo.taskCount === 1 ? "" : "s"} for {loadInfo.today}.
+              {" "}Daily/template-backed: {loadInfo.templateBackedCount}. Sections: {loadInfo.sectionCount}.
             </div>
           )}
 
           {sections.length === 0 ? (
-            <div className="panel error">No tasks found for today. Create a section and add tasks, or press Refresh to try repopulating daily items.</div>
+            <div className="panel error">
+              No sections were returned. Create a section, press Refresh, or check Supabase RLS for the sections table.
+            </div>
           ) : totalTasksToday === 0 ? (
-            <div className="panel error">No tasks found for today. Use Refresh to populate today's daily tasks, or add a task manually.</div>
+            <div className="panel error">
+              No tasks found for today. Press Refresh once. If this stays at 0, check task_templates rows and RLS policies.
+            </div>
           ) : (
             sections.map((section) => (
               <div className="panel" key={section.id}>
@@ -683,52 +996,57 @@
 
       useEffect(() => setTasks(section.tasks || []), [section.tasks]);
 
+      function sameId(a, b) {
+        return String(a) === String(b);
+      }
+
       function applyTasks(nextTasks) {
         setTasks(nextTasks);
-        const nextSections = sections.map((s) => s.id === section.id ? { ...s, tasks: nextTasks } : s);
+        const nextSections = sections.map((s) => (
+          String(s.id) === String(section.id) ? { ...s, tasks: nextTasks } : s
+        ));
         setSections(nextSections);
         cache.set(user.id, nextSections);
       }
 
       function reindexTasks(taskList) {
-        return taskList.map((t, i) => ({ ...t, order_index: i }));
-      }
-
-      function sameId(a, b) {
-        return String(a) === String(b);
+        return taskList.map((task, index) => ({ ...task, order_index: index }));
       }
 
       async function persistTaskOrder(taskList) {
         const updates = [];
-        for (const t of taskList) {
-          updates.push(supabase.from("tasks").update({ order_index: t.order_index }).eq("id", t.id));
-          if (t.template_id) {
-            updates.push(supabase.from("task_templates").update({ order_index: t.order_index }).eq("id", t.template_id));
+        for (const task of taskList) {
+          updates.push(supabase.from("tasks").update({ order_index: task.order_index }).eq("id", task.id));
+          if (task.template_id) {
+            updates.push(supabase.from("task_templates").update({ order_index: task.order_index }).eq("id", task.template_id));
           }
         }
         await Promise.all(updates);
       }
 
       function isDescendantOf(candidateId, ancestorId) {
-        let current = tasks.find((t) => sameId(t.id, candidateId));
+        let current = tasks.find((task) => sameId(task.id, candidateId));
         const seen = new Set();
+
         while (current?.parent_task_id) {
           const key = String(current.id);
           if (seen.has(key)) break;
           seen.add(key);
+
           if (sameId(current.parent_task_id, ancestorId)) return true;
-          current = tasks.find((t) => sameId(t.id, current.parent_task_id));
+          current = tasks.find((task) => sameId(task.id, current.parent_task_id));
         }
+
         return false;
       }
 
       function findInsertIndexForParent(parentId) {
-        const parentIndex = tasks.findIndex((t) => sameId(t.id, parentId));
+        const parentIndex = tasks.findIndex((task) => sameId(task.id, parentId));
         if (parentIndex < 0) return tasks.length;
+
         let i = parentIndex + 1;
-        while (i < tasks.length && isDescendantOf(tasks[i].id, parentId)) {
-          i += 1;
-        }
+        while (i < tasks.length && isDescendantOf(tasks[i].id, parentId)) i += 1;
+
         return i;
       }
 
@@ -740,42 +1058,75 @@
 
       async function addTask(e) {
         e.preventDefault();
+
         const text = newTaskText.trim();
         if (!text) return;
+
         const last = tasks[tasks.length - 1];
         const parentTaskId = forcedParentTaskId || (isSubtaskMode && last ? (last.parent_task_id || last.id) : null);
-        const parentTask = parentTaskId ? tasks.find((t) => sameId(t.id, parentTaskId)) : null;
+        const parentTask = parentTaskId ? tasks.find((task) => sameId(task.id, parentTaskId)) : null;
         const parentTemplateId = parentTask?.template_id || null;
         const insertIndex = parentTaskId ? findInsertIndexForParent(parentTaskId) : tasks.length;
 
         try {
           let createdTask = null;
+
           if (taskType === "daily") {
-            const { data: tData, error: tErr } = await supabase
+            const { data: templateData, error: templateError } = await supabase
               .from("task_templates")
-              .insert([{ section_id: section.id, user_id: user.id, text, parent_task_id: parentTemplateId, order_index: insertIndex }])
+              .insert([{
+                section_id: section.id,
+                user_id: user.id,
+                text,
+                parent_task_id: parentTemplateId,
+                order_index: insertIndex
+              }])
               .select("id");
-            if (tErr) throw tErr;
+
+            if (templateError) throw templateError;
 
             const { data, error } = await supabase
               .from("tasks")
-              .insert([{ section_id: section.id, user_id: user.id, text, completed: false, date: today, template_id: tData[0].id, parent_task_id: parentTaskId, order_index: insertIndex }])
+              .insert([{
+                section_id: section.id,
+                user_id: user.id,
+                text,
+                completed: false,
+                date: today,
+                template_id: templateData[0].id,
+                parent_task_id: parentTaskId,
+                order_index: insertIndex
+              }])
               .select();
+
             if (error) throw error;
             createdTask = data[0];
           } else {
             const { data, error } = await supabase
               .from("tasks")
-              .insert([{ section_id: section.id, user_id: user.id, text, completed: false, date: today, template_id: null, parent_task_id: parentTaskId, order_index: insertIndex }])
+              .insert([{
+                section_id: section.id,
+                user_id: user.id,
+                text,
+                completed: false,
+                date: today,
+                template_id: null,
+                parent_task_id: parentTaskId,
+                order_index: insertIndex
+              }])
               .select();
+
             if (error) throw error;
             createdTask = data[0];
           }
+
           const next = [...tasks];
           next.splice(insertIndex, 0, createdTask);
           const normalized = reindexTasks(next);
+
           applyTasks(normalized);
           await persistTaskOrder(normalized);
+
           setNewTaskText("");
           setIsSubtaskMode(false);
           setForcedParentTaskId(null);
@@ -788,7 +1139,10 @@
         try {
           const { error } = await supabase.from("tasks").update({ completed }).eq("id", taskId);
           if (error) throw error;
-          applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, completed } : t));
+
+          applyTasks(tasks.map((task) => (
+            sameId(task.id, taskId) ? { ...task, completed } : task
+          )));
         } catch (e) {
           setError("Failed to update task: " + e.message);
         }
@@ -796,12 +1150,22 @@
 
       async function deleteTask(taskId) {
         const task = tasks.find((t) => sameId(t.id, taskId));
+
         try {
-          const { error } = await supabase.from("tasks").delete().or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+          const { error } = await supabase
+            .from("tasks")
+            .delete()
+            .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+
           if (error) throw error;
+
           if (task?.template_id) {
-            await supabase.from("task_templates").delete().or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
+            await supabase
+              .from("task_templates")
+              .delete()
+              .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
           }
+
           applyTasks(tasks.filter((t) => !sameId(t.id, taskId) && !sameId(t.parent_task_id, taskId)));
         } catch (e) {
           setError("Failed to delete task: " + e.message);
@@ -810,23 +1174,30 @@
 
       async function updateTaskParent(taskId, parentId) {
         const task = tasks.find((t) => sameId(t.id, taskId));
+
         try {
           if (parentId && isDescendantOf(parentId, taskId)) {
             setError("Cannot set parent to a descendant task.");
             return;
           }
 
-          const { error } = await supabase.from("tasks").update({ parent_task_id: parentId }).eq("id", taskId);
+          const { error } = await supabase
+            .from("tasks")
+            .update({ parent_task_id: parentId })
+            .eq("id", taskId);
+
           if (error) throw error;
 
           if (task?.template_id) {
             const parentTask = parentId ? tasks.find((t) => sameId(t.id, parentId)) : null;
             const templateParentId = parentTask?.template_id || null;
-            const { error: te } = await supabase.from("task_templates").update({ parent_task_id: templateParentId }).eq("id", task.template_id);
-            if (te) throw te;
-            if (parentId && !templateParentId) {
-              setError("Subtask set for today. Template parent was not set because selected parent is one-time.");
-            }
+
+            const { error: templateError } = await supabase
+              .from("task_templates")
+              .update({ parent_task_id: templateParentId })
+              .eq("id", task.template_id);
+
+            if (templateError) throw templateError;
           }
 
           applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, parent_task_id: parentId } : t));
@@ -836,19 +1207,23 @@
       }
 
       async function moveTask(taskId, direction) {
-        const idx = tasks.findIndex((t) => sameId(t.id, taskId));
-        const targetIndex = idx + direction;
-        if (idx < 0 || targetIndex < 0 || targetIndex >= tasks.length) return;
-        const a = tasks[idx];
+        const index = tasks.findIndex((task) => sameId(task.id, taskId));
+        const targetIndex = index + direction;
+
+        if (index < 0 || targetIndex < 0 || targetIndex >= tasks.length) return;
+
+        const a = tasks[index];
         const b = tasks[targetIndex];
-        const aOrder = a.order_index ?? idx;
+
+        const aOrder = a.order_index ?? index;
         const bOrder = b.order_index ?? targetIndex;
 
-        const next = tasks.map((t) => {
-          if (sameId(t.id, a.id)) return { ...t, order_index: bOrder };
-          if (sameId(t.id, b.id)) return { ...t, order_index: aOrder };
-          return t;
+        const next = tasks.map((task) => {
+          if (sameId(task.id, a.id)) return { ...task, order_index: bOrder };
+          if (sameId(task.id, b.id)) return { ...task, order_index: aOrder };
+          return task;
         }).sort((x, y) => x.order_index - y.order_index);
+
         applyTasks(next);
 
         try {
@@ -856,29 +1231,15 @@
             supabase.from("tasks").update({ order_index: bOrder }).eq("id", a.id),
             supabase.from("tasks").update({ order_index: aOrder }).eq("id", b.id)
           ];
-          if (a.template_id) updates.push(supabase.from("task_templates").update({ order_index: bOrder }).eq("id", a.template_id));
-          if (b.template_id) updates.push(supabase.from("task_templates").update({ order_index: aOrder }).eq("id", b.template_id));
+
+          if (a.template_id) updates.push(
+            supabase.from("task_templates").update({ order_index: bOrder }).eq("id", a.template_id)
+          );
+          if (b.template_id) updates.push(
+            supabase.from("task_templates").update({ order_index: aOrder }).eq("id", b.template_id)
+          );
+
           await Promise.all(updates);
-        } catch (e) {
-          setError("Order sync failed: " + e.message);
-        }
-      }
-
-      async function moveTaskTo(taskId, targetIndex) {
-        const idx = tasks.findIndex((t) => sameId(t.id, taskId));
-        if (idx < 0) return;
-        if (targetIndex < 0) targetIndex = 0;
-        if (targetIndex > tasks.length - 1) targetIndex = tasks.length - 1;
-        if (targetIndex === idx) return;
-
-        const next = [...tasks];
-        const [moved] = next.splice(idx, 1);
-        next.splice(targetIndex, 0, moved);
-        const normalized = reindexTasks(next);
-        applyTasks(normalized);
-
-        try {
-          await persistTaskOrder(normalized);
         } catch (e) {
           setError("Order sync failed: " + e.message);
         }
@@ -887,14 +1248,21 @@
       async function updateTaskText(taskId, newText) {
         const text = newText.trim();
         if (!text) return;
+
         try {
           const { error } = await supabase.from("tasks").update({ text }).eq("id", taskId);
           if (error) throw error;
+
           const task = tasks.find((t) => sameId(t.id, taskId));
           if (task?.template_id) {
-            const { error: te } = await supabase.from("task_templates").update({ text }).eq("id", task.template_id);
-            if (te) throw te;
+            const { error: templateError } = await supabase
+              .from("task_templates")
+              .update({ text })
+              .eq("id", task.template_id);
+
+            if (templateError) throw templateError;
           }
+
           applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, text } : t));
         } catch (e) {
           setError("Update failed: " + e.message);
@@ -909,7 +1277,7 @@
               ref={newTaskInputRef}
               type="text"
               value={newTaskText}
-              placeholder={forcedParentTaskId ? "Add subtask under selected task..." : (isSubtaskMode ? "Add as subtask..." : "Add task (Tab for subtask)...")}
+              placeholder={forcedParentTaskId ? "Add subtask under selected task..." : (isSubtaskMode ? "Add as subtask..." : "Add task...")}
               onChange={(e) => setNewTaskText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Tab" && !forcedParentTaskId) {
@@ -950,7 +1318,7 @@
           </div>
 
           <ul className="tasks">
-            {tasks.map((task, i) => (
+            {tasks.map((task) => (
               <React.Fragment key={task.id}>
                 <TaskItem
                   task={task}
@@ -970,6 +1338,7 @@
         </>
       );
     }
+
     function TaskItem({ task, toggleTask, deleteTask, moveTask, updateTaskText, updateTaskParent, startSubtaskFor }) {
       const [editing, setEditing] = useState(false);
       const [text, setText] = useState(task.text);
@@ -984,7 +1353,12 @@
 
       return (
         <li className={`task ${task.completed ? "done" : ""} ${task.parent_task_id ? "sub" : ""}`}>
-          <input type="checkbox" checked={task.completed} onChange={(e) => toggleTask(task.id, e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={task.completed}
+            onChange={(e) => toggleTask(task.id, e.target.checked)}
+          />
+
           <div style={{ flex: 1, minWidth: 0 }}>
             {editing ? (
               <input
@@ -994,32 +1368,38 @@
                 onBlur={save}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") save();
-                  if (e.key === "Escape") { setText(task.text); setEditing(false); }
+                  if (e.key === "Escape") {
+                    setText(task.text);
+                    setEditing(false);
+                  }
                 }}
                 autoFocus
               />
             ) : (
-              <span className="task-text" title="Click to edit" onClick={() => setEditing(true)}>{task.text}</span>
+              <span className="task-text" title="Click to edit" onClick={() => setEditing(true)}>
+                {task.text}
+              </span>
             )}
           </div>
+
           <div className="meta">
-            <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>{"+"}</button>
+            <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>+</button>
             <button className="icon" title="Move up" onClick={() => moveTask(task.id, -1)}>{"\u2191"}</button>
             <button className="icon" title="Move down" onClick={() => moveTask(task.id, 1)}>{"\u2193"}</button>
             {task.parent_task_id && (
               <button className="icon" title="Remove parent" onClick={() => updateTaskParent(task.id, null)}>-</button>
             )}
-            <span className={`badge ${task.template_id ? "b1" : "b2"}`}>{task.template_id ? "Daily" : "One-Time"}</span>
+            <span className={`badge ${task.template_id ? "b1" : "b2"}`}>
+              {task.template_id ? "Daily" : "One-Time"}
+            </span>
             <button className="icon" title="Delete task" onClick={() => deleteTask(task.id)}>{"\u00D7"}</button>
           </div>
         </li>
       );
     }
+
     const root = window.ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
 </html>
-
-
-
