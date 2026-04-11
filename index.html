@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Task System - BUILD 2026-04-08B</title>
+  <title>Daily Task System</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -30,7 +30,7 @@
     .section-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--panel2); padding-bottom: 8px; }
     .section-title { color: var(--lime); font-weight: 800; text-transform: uppercase; }
     .tasks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-    .task { display: flex; gap: 10px; background: var(--panel2); padding: 10px; align-items: center; border: 1px solid #3a3a3a; border-radius: 8px; }
+    .task { display: flex; gap: 10px; background: var(--panel2); padding: 10px; align-items: flex-start; border: 1px solid #3a3a3a; border-radius: 8px; }
     .task.sub { margin-left: 20px; border-left: 2px solid var(--cyan); }
     .task.done { opacity: .55; }
     .task-text { cursor: pointer; word-break: break-word; }
@@ -54,11 +54,13 @@
     .error { border-left-color: var(--red); color: #ffb5b5; }
     .auth { max-width: 460px; margin: 40px auto; background: var(--panel); border: 1px solid var(--panel2); padding: 18px; }
     .loading { text-align: center; color: var(--muted); padding: 30px; }
+    .subtask-form { margin: 8px 0 8px 24px; }
+
     @media (max-width: 700px) {
       .task {
         flex-wrap: nowrap;
-        align-items: center;
-        min-height: 52px;
+        align-items: flex-start;
+        min-height: 56px;
         padding: 10px 8px;
       }
       .task > div[style] {
@@ -66,35 +68,33 @@
       }
       .task-text {
         display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.3;
       }
       .meta {
         width: auto;
         margin-left: auto;
         flex-wrap: nowrap;
         gap: 4px;
+        flex-shrink: 0;
       }
       .icon {
-        width: 26px;
-        height: 26px;
+        width: 28px;
+        height: 28px;
         border-radius: 5px;
         font-size: 13px;
       }
       .badge {
-        padding: 2px 4px;
+        padding: 2px 5px;
         font-size: 9px;
+        display: inline-block;
       }
       .task.sub {
         margin-left: 8px;
       }
-    }
-
-    @media (max-width: 430px) {
-      .badge {
-        display: none;
-      }
+      .subtask-form { margin-left: 10px; }
     }
   </style>
 </head>
@@ -134,13 +134,6 @@
 
     const safeStorage = getSafeStorage();
 
-    function withTimeout(promise, ms, label) {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(label + " timed out")), ms))
-      ]);
-    }
-
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         autoRefreshToken: true,
@@ -151,9 +144,27 @@
     });
 
     function getCurrentDate() {
-      const now = new Date();
-      const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-      return est.toISOString().slice(0, 10);
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(new Date());
+      const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${byType.year}-${byType.month}-${byType.day}`;
+    }
+
+    function getDateDaysAgo(daysAgo) {
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(d);
+      const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${byType.year}-${byType.month}-${byType.day}`;
     }
 
     const cache = {
@@ -171,6 +182,21 @@
       clear: (uid) => { try { safeStorage.removeItem(`todo_cache_${uid}`); } catch {} }
     };
 
+    const historyCache = {
+      get: (uid) => {
+        try {
+          const raw = safeStorage.getItem(`todo_history_v2_${uid}`);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return parsed.date === getCurrentDate() ? parsed.payload : null;
+        } catch { return null; }
+      },
+      set: (uid, payload) => {
+        try { safeStorage.setItem(`todo_history_v2_${uid}`, JSON.stringify({ date: getCurrentDate(), payload })); } catch {}
+      },
+      clear: (uid) => { try { safeStorage.removeItem(`todo_history_v2_${uid}`); } catch {} }
+    };
+
     function App() {
       return <MainApp />;
     }
@@ -182,7 +208,9 @@
       const [sections, setSections] = useState([]);
       const [archive, setArchive] = useState(null);
       const [showArchive, setShowArchive] = useState(false);
+      const [loadInfo, setLoadInfo] = useState(null);
       const userRef = useRef(null);
+      const dateRef = useRef(getCurrentDate());
 
       useEffect(() => { userRef.current = user; }, [user]);
 
@@ -194,52 +222,56 @@
           });
         }, 9000);
 
-        checkUser();
-
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
           const nextUser = session?.user || null;
           setUser(nextUser);
+          setLoading(false);
 
           if (event === "SIGNED_OUT") {
             if (userRef.current?.id) cache.clear(userRef.current.id);
+            if (userRef.current?.id) historyCache.clear(userRef.current.id);
             setSections([]);
             setArchive(null);
             setShowArchive(false);
+            setLoadInfo(null);
             setLoading(false);
           }
 
           if (nextUser) {
-            handleNewDay(getCurrentDate(), nextUser.id).catch(console.error);
-            loadSections(nextUser.id, false).catch((e) => setError("Failed to load sections: " + e.message));
+            try {
+              const cached = cache.get(nextUser.id);
+              if (cached) setSections(cached);
+              await handleNewDay(getCurrentDate(), nextUser.id);
+              await loadSections(nextUser.id, true);
+            } catch (e) {
+              setError("Failed to load sections: " + e.message);
+            }
           }
         });
 
+        const midnightWatcher = setInterval(async () => {
+          const currentDate = getCurrentDate();
+          if (currentDate === dateRef.current) return;
+          dateRef.current = currentDate;
+          const uid = userRef.current?.id;
+          if (!uid) return;
+          try {
+            cache.clear(uid);
+            historyCache.clear(uid);
+            await handleNewDay(currentDate, uid);
+            await loadSections(uid, true);
+            setArchive(null);
+          } catch (e) {
+            setError("Midnight refresh failed: " + e.message);
+          }
+        }, 60000);
+
         return () => {
           clearTimeout(failsafe);
+          clearInterval(midnightWatcher);
           authListener?.subscription?.unsubscribe();
         };
       }, []);
-
-      async function checkUser() {
-        try {
-          const { data: { session } } = await withTimeout(supabase.auth.getSession(), 6000, "getSession");
-          const currentUser = session?.user || null;
-          setUser(currentUser);
-          setLoading(false);
-
-          if (!currentUser) return;
-
-          const cached = cache.get(currentUser.id);
-          if (cached) setSections(cached);
-
-          handleNewDay(getCurrentDate(), currentUser.id).catch(console.error);
-          loadSections(currentUser.id, false).catch((e) => setError("Failed to load sections: " + e.message));
-        } catch (e) {
-          setError("Auth bootstrap failed: " + e.message);
-          setUser(null);
-          setLoading(false);
-        }
-      }
 
       async function handleNewDay(date, userId) {
         if (!userId) return;
@@ -275,28 +307,54 @@
             completed: false,
             date,
             template_id: t.id,
-            parent_task_id: t.parent_task_id,
+            parent_task_id: null,
             order_index: t.order_index || 0
           }));
-          const { error: insertError } = await supabase.from("tasks").insert(rows);
-          if (insertError && insertError.code !== "23505") console.error(insertError);
+          const { data: createdTasks, error: insertError } = await supabase
+            .from("tasks")
+            .insert(rows)
+            .select("id,template_id");
+          if (insertError) {
+            if (insertError.code !== "23505") throw insertError;
+          } else {
+            const taskByTemplateId = {};
+            (createdTasks || []).forEach((task) => {
+              taskByTemplateId[String(task.template_id)] = task.id;
+            });
+
+            const parentUpdates = templates
+              .filter((template) => template.parent_task_id && taskByTemplateId[String(template.parent_task_id)] && taskByTemplateId[String(template.id)])
+              .map((template) => supabase
+                .from("tasks")
+                .update({ parent_task_id: taskByTemplateId[String(template.parent_task_id)] })
+                .eq("id", taskByTemplateId[String(template.id)]));
+
+            if (parentUpdates.length > 0) await Promise.all(parentUpdates);
+          }
           safeStorage.setItem(`last_init_${userId}`, date);
         } catch (e) {
-          console.error(e);
+          setError("Failed to create today's daily tasks: " + e.message);
+          throw e;
         }
       }
 
       async function loadSections(userIdFromCall, force = false) {
-        const userId = userIdFromCall || (await supabase.auth.getUser()).data.user?.id;
+        const userId = userIdFromCall || userRef.current?.id;
         if (!userId) return;
+        if (force) {
+          safeStorage.removeItem(`last_init_${userId}`);
+          await handleNewDay(getCurrentDate(), userId);
+        }
         if (!force) {
           const cached = cache.get(userId);
           if (cached) {
             setSections(cached);
-            return;
+            const hasTasks = cached.some((s) => (s.tasks || []).length > 0);
+            if (hasTasks) return;
           }
         }
         const today = getCurrentDate();
+        let activeDate = today;
 
         const { data: sectionsData, error: sectionsError } = await supabase
           .from("sections")
@@ -313,32 +371,75 @@
           .order("order_index", { ascending: true });
         if (tasksError) throw tasksError;
 
+        let effectiveTasks = tasksData || [];
+        if (effectiveTasks.length === 0) {
+          const { data: recentTasks, error: recentError } = await supabase
+            .from("tasks")
+            .select("id,section_id,user_id,text,completed,date,template_id,parent_task_id,order_index")
+            .eq("user_id", userId)
+            .gte("date", getDateDaysAgo(7))
+            .order("date", { ascending: false })
+            .order("order_index", { ascending: true });
+          if (recentError) throw recentError;
+          if (recentTasks && recentTasks.length > 0) {
+            activeDate = recentTasks[0].date;
+            effectiveTasks = recentTasks.filter((task) => task.date === activeDate);
+          }
+        }
+
         const merged = (sectionsData || []).map((s) => ({
           ...s,
-          tasks: (tasksData || []).filter((t) => t.section_id === s.id)
+          tasks: effectiveTasks.filter((t) => String(t.section_id) === String(s.id))
         }));
+        const knownSectionIds = new Set((sectionsData || []).map((s) => String(s.id)));
+        const orphanTasks = effectiveTasks.filter((t) => !knownSectionIds.has(String(t.section_id)));
+        if (orphanTasks.length > 0) {
+          merged.push({
+            id: "unsectioned",
+            user_id: userId,
+            name: "Tasks",
+            order_index: Number.MAX_SAFE_INTEGER,
+            tasks: orphanTasks
+          });
+        }
         setSections(merged);
         cache.set(userId, merged);
+        const taskCount = effectiveTasks.length;
+        setLoadInfo({
+          today,
+          activeDate,
+          taskCount,
+          sectionCount: (sectionsData || []).length,
+          usedFallbackDate: activeDate !== today
+        });
       }
 
       async function loadArchive() {
         if (archive) { setShowArchive(!showArchive); return; }
         try {
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (!currentUser) return;
-          const d = new Date();
-          const start = new Date(d);
-          start.setDate(d.getDate() - 7);
+          const currentUser = userRef.current;
+          if (!currentUser) {
+            setError("History is available after sign in.");
+            return;
+          }
+          const cached = historyCache.get(currentUser.id);
+          if (cached) {
+            setArchive(cached);
+            setShowArchive(true);
+            return;
+          }
+          const startDate = getDateDaysAgo(7);
 
           const { data, error } = await supabase
             .from("tasks")
-            .select("text,completed,date")
+            .select("text,completed,date,template_id,section_id,sections(name)")
             .eq("user_id", currentUser.id)
-            .lt("date", getCurrentDate())
-            .gte("date", start.toISOString().slice(0, 10))
+            .lte("date", getCurrentDate())
+            .gte("date", startDate)
             .order("date", { ascending: false });
           if (error) throw error;
           setArchive(data || []);
+          historyCache.set(currentUser.id, data || []);
           setShowArchive(true);
         } catch (e) {
           setError("Failed to load archive: " + e.message);
@@ -360,6 +461,7 @@
             loadArchive={loadArchive}
             archive={archive}
             showArchive={showArchive}
+            loadInfo={loadInfo}
           />
         </>
       );
@@ -417,12 +519,18 @@
       );
     }
 
-    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive }) {
+    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
       const todayPretty = new Date().toLocaleDateString("en-US", {
         weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/New_York"
       });
+      const totalTasksToday = sections.reduce((sum, s) => sum + (s.tasks?.length || 0), 0);
+      const groupedArchive = (archive || []).reduce((acc, item) => {
+        if (!acc[item.date]) acc[item.date] = [];
+        acc[item.date].push(item);
+        return acc;
+      }, {});
 
       async function addSection(e) {
         e.preventDefault();
@@ -484,12 +592,12 @@
       return (
         <>
           <h1 className="title">{todayPretty}</h1>
-          <div className="tag">Task Protocol | BUILD 2026-04-08B</div>
+          <div className="tag">Task Protocol</div>
 
           <div className="bar">
             <div className="left">
               <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
-              <button className="btn gray" onClick={() => loadSections(null, true)}>Refresh</button>
+              <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
               <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
             </div>
             <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
@@ -509,20 +617,42 @@
 
           {showArchive && archive && (
             <div className="panel" style={{ borderLeftColor: "var(--gold)" }}>
-              <div className="section-title" style={{ color: "var(--gold)", marginBottom: "8px" }}>Past 7 Days</div>
-              <ul className="tasks">
-                {archive.map((t, i) => (
-                  <li key={`${t.date}-${i}`} className="task" style={{ opacity: 0.75 }}>
-                    <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 80 }}>{t.date}</span>
-                    <span className="task-text" style={{ textDecoration: t.completed ? "line-through" : "none" }}>{t.text}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="section-title" style={{ color: "var(--gold)", marginBottom: "8px" }}>History by Day (Last 7 Days)</div>
+              {Object.keys(groupedArchive).length === 0 ? (
+                <div style={{ color: "var(--muted)" }}>No history for the last 7 days.</div>
+              ) : (
+                Object.entries(groupedArchive).map(([day, items]) => (
+                  <div key={day} style={{ marginBottom: "10px" }}>
+                    <div style={{ color: "var(--gold)", fontWeight: 700, marginBottom: "4px" }}>{day}</div>
+                    <ul className="tasks">
+                      {items.map((t, i) => (
+                        <li key={`${day}-${i}`} className="task" style={{ opacity: 0.85 }}>
+                          <span className="task-text" style={{ textDecoration: t.completed ? "line-through" : "none" }}>{t.text}</span>
+                          <div className="meta">
+                            <span className="badge b2">{t.sections?.name || "No Section"}</span>
+                            <span className={`badge ${t.template_id ? "b1" : "b2"}`}>{t.template_id ? "Daily" : "One-Time"}</span>
+                            <span className={`badge ${t.completed ? "b1" : "b2"}`}>{t.completed ? "Done" : "Open"}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {loadInfo && (
+            <div className={`panel ${loadInfo.usedFallbackDate || loadInfo.taskCount === 0 ? "error" : ""}`}>
+              Loaded {loadInfo.taskCount} task{loadInfo.taskCount === 1 ? "" : "s"} from {loadInfo.activeDate}.
+              {loadInfo.usedFallbackDate && ` No rows were returned for ${loadInfo.today}, so the app is showing the latest day with tasks.`}
             </div>
           )}
 
           {sections.length === 0 ? (
-            <div className="panel">Welcome. Click + New Section to get started.</div>
+            <div className="panel error">No tasks found for today. Create a section and add tasks, or press Refresh to try repopulating daily items.</div>
+          ) : totalTasksToday === 0 ? (
+            <div className="panel error">No tasks found for today. Use Refresh to populate today's daily tasks, or add a task manually.</div>
           ) : (
             sections.map((section) => (
               <div className="panel" key={section.id}>
@@ -771,6 +901,43 @@
         }
       }
 
+      function renderTaskComposer(isInline) {
+        return (
+          <form className={`row ${isInline ? "subtask-form" : ""}`} onSubmit={addTask}>
+            <input
+              className="in"
+              ref={newTaskInputRef}
+              type="text"
+              value={newTaskText}
+              placeholder={forcedParentTaskId ? "Add subtask under selected task..." : (isSubtaskMode ? "Add as subtask..." : "Add task (Tab for subtask)...")}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" && !forcedParentTaskId) {
+                  e.preventDefault();
+                  setIsSubtaskMode((v) => !v);
+                }
+              }}
+            />
+            <button type="button" className={`btn ${taskType === "daily" ? "" : "gray"}`} onClick={() => setTaskType("daily")}>Daily</button>
+            <button type="button" className={`btn ${taskType === "one-time" ? "" : "gray"}`} onClick={() => setTaskType("one-time")}>One-Time</button>
+            <button type="submit" className="btn">Add</button>
+            {isInline && (
+              <button
+                type="button"
+                className="btn gray"
+                onClick={() => {
+                  setForcedParentTaskId(null);
+                  setIsSubtaskMode(false);
+                  setNewTaskText("");
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </form>
+        );
+      }
+
       return (
         <>
           <div className="section-head">
@@ -784,38 +951,22 @@
 
           <ul className="tasks">
             {tasks.map((task, i) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                toggleTask={toggleTask}
-                deleteTask={deleteTask}
-                moveTask={moveTask}
-                updateTaskText={updateTaskText}
-                updateTaskParent={updateTaskParent}
-                startSubtaskFor={startSubtaskFor}
-              />
+              <React.Fragment key={task.id}>
+                <TaskItem
+                  task={task}
+                  toggleTask={toggleTask}
+                  deleteTask={deleteTask}
+                  moveTask={moveTask}
+                  updateTaskText={updateTaskText}
+                  updateTaskParent={updateTaskParent}
+                  startSubtaskFor={startSubtaskFor}
+                />
+                {forcedParentTaskId && sameId(forcedParentTaskId, task.id) && renderTaskComposer(true)}
+              </React.Fragment>
             ))}
           </ul>
 
-          <form className="row" onSubmit={addTask}>
-            <input
-              className="in"
-              ref={newTaskInputRef}
-              type="text"
-              value={newTaskText}
-              placeholder={forcedParentTaskId ? "Add subtask under selected task..." : (isSubtaskMode ? "Add as subtask..." : "Add task (Tab for subtask)...")}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  setIsSubtaskMode((v) => !v);
-                }
-              }}
-            />
-            <button type="button" className={`btn ${taskType === "daily" ? "" : "gray"}`} onClick={() => setTaskType("daily")}>Daily</button>
-            <button type="button" className={`btn ${taskType === "one-time" ? "" : "gray"}`} onClick={() => setTaskType("one-time")}>One-Time</button>
-            <button type="submit" className="btn">Add</button>
-          </form>
+          {!forcedParentTaskId && renderTaskComposer(false)}
         </>
       );
     }
@@ -852,14 +1003,14 @@
             )}
           </div>
           <div className="meta">
-            <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>+</button>
-            <button className="icon" title="Move up" onClick={() => moveTask(task.id, -1)}>↑</button>
-            <button className="icon" title="Move down" onClick={() => moveTask(task.id, 1)}>↓</button>
+            <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>{"+"}</button>
+            <button className="icon" title="Move up" onClick={() => moveTask(task.id, -1)}>{"\u2191"}</button>
+            <button className="icon" title="Move down" onClick={() => moveTask(task.id, 1)}>{"\u2193"}</button>
             {task.parent_task_id && (
               <button className="icon" title="Remove parent" onClick={() => updateTaskParent(task.id, null)}>-</button>
             )}
             <span className={`badge ${task.template_id ? "b1" : "b2"}`}>{task.template_id ? "Daily" : "One-Time"}</span>
-            <button className="icon" title="Delete task" onClick={() => deleteTask(task.id)}>×</button>
+            <button className="icon" title="Delete task" onClick={() => deleteTask(task.id)}>{"\u00D7"}</button>
           </div>
         </li>
       );
@@ -869,5 +1020,6 @@
   </script>
 </body>
 </html>
+
 
 
