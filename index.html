@@ -221,6 +221,15 @@
       white-space: nowrap;
     }
 
+    .check {
+      accent-color: var(--lime);
+      cursor: pointer;
+      flex-shrink: 0;
+      height: 18px;
+      margin-top: 2px;
+      width: 18px;
+    }
+
     .b1 { border-color: var(--lime); color: var(--lime); }
     .b2 { border-color: var(--cyan); color: var(--cyan); }
     .b3 { border-color: var(--gold); color: var(--gold); }
@@ -1136,14 +1145,28 @@
       }
 
       async function toggleTask(taskId, completed) {
-        try {
-          const { error } = await supabase.from("tasks").update({ completed }).eq("id", taskId);
-          if (error) throw error;
+        const previousTasks = tasks;
+        const nextTasks = tasks.map((task) => (
+          sameId(task.id, taskId) ? { ...task, completed } : task
+        ));
 
-          applyTasks(tasks.map((task) => (
-            sameId(task.id, taskId) ? { ...task, completed } : task
-          )));
+        applyTasks(nextTasks);
+
+        try {
+          const { data, error } = await supabase
+            .from("tasks")
+            .update({ completed })
+            .eq("id", taskId)
+            .eq("user_id", user.id)
+            .select("id")
+            .maybeSingle();
+
+          if (error) throw error;
+          if (!data) throw new Error("Supabase did not update this task.");
+
+          setError(null);
         } catch (e) {
+          applyTasks(previousTasks);
           setError("Failed to update task: " + e.message);
         }
       }
@@ -1354,8 +1377,9 @@
       return (
         <li className={`task ${task.completed ? "done" : ""} ${task.parent_task_id ? "sub" : ""}`}>
           <input
+            className="check"
             type="checkbox"
-            checked={task.completed}
+            checked={Boolean(task.completed)}
             onChange={(e) => toggleTask(task.id, e.target.checked)}
           />
 
