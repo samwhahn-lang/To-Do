@@ -1,70 +1,67 @@
-# 🔒 Private To-Do List
+# Private To-Do List
 
-A daily task management app with **private data storage** and **cross-device sync**.
+A daily task management app with private Supabase data storage and cross-device sync.
 
 ## Features
 
-- ✅ **User-defined sections** - Create custom categories for organizing tasks
-- ✅ **Repeating daily tasks** - Mark tasks to appear automatically each day
-- ✅ **Date-based archiving** - All completed tasks tracked by date
-- ✅ **Cross-device sync** - Access from phone, tablet, or computer
-- ✅ **Private & secure** - Your data is encrypted and only accessible by you
-- ✅ **Offline-ready** - Works even without internet
+- User-defined sections for organizing tasks
+- Daily repeating tasks backed by templates
+- One-time tasks for today's list
+- Subtasks and task ordering
+- Seven-day task history
+- Cross-device sync through Supabase
+- Offline-friendly local cache while the app reloads
 
 ## Privacy Model
 
 **Public (GitHub):**
-- ✅ Application code (HTML/CSS/JavaScript)
-- ✅ Setup instructions
-- ✅ Documentation
+- Application code in `index.html`
+- Setup instructions
+- Documentation
 
 **Private (Supabase Database):**
-- 🔒 Your to-do items and tasks
-- 🔒 Your sections and categories
-- 🔒 Your user credentials
-- 🔒 All personal data
+- Your to-do items and tasks
+- Your sections and categories
+- Your user credentials
+- All personal task data
 
-**How it works:** The code is open source, but your actual task data is stored in a private Supabase database with Row Level Security (RLS) enabled. Only you can access your data.
+**How it works:** The code can be public, but your actual task data is stored in a private Supabase database with Row Level Security (RLS) enabled. Each signed-in user can only read and modify their own rows.
 
 ## Quick Start
 
 1. **Set up Supabase** (free account)
    - Create a new project at [supabase.com](https://supabase.com)
-   - Run the SQL schema (see SETUP.md)
+   - Run the SQL schema (see `setup.md`)
    - Get your API credentials
 
 2. **Configure the app**
    - Clone this repository
-   - Add your Supabase URL and API key to `todo-app.html`
+   - Add your Supabase URL and publishable key to `index.html`
 
 3. **Deploy**
    - Push to GitHub
    - Enable GitHub Pages
    - Access from anywhere!
 
-📖 **Full setup instructions:** See [SETUP.md](./SETUP.md)
+**Full setup instructions:** See [setup.md](./setup.md)
 
 ## Tech Stack
 
-- **Frontend:** React (via CDN), vanilla JavaScript
-- **Backend:** Supabase (PostgreSQL database + authentication)
-- **Hosting:** GitHub Pages (static hosting)
-- **Security:** Row Level Security (RLS) policies
-
-## Screenshots
-
-*(Add screenshots here after deployment)*
+- **Frontend:** React via CDN, Babel Standalone, vanilla JavaScript
+- **Backend:** Supabase PostgreSQL database and authentication
+- **Hosting:** GitHub Pages or any static file host
+- **Security:** Supabase Row Level Security policies
 
 ## Development
 
 To run locally:
-1. Configure Supabase credentials in `todo-app.html`
-2. Open `todo-app.html` in your browser
+1. Configure Supabase credentials in `index.html`
+2. Open `index.html` in your browser
 3. Sign up and start using!
 
 ## License
 
-MIT License - See LICENSE file for details
+No license file is currently included.
 
 ## Support
 

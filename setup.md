@@ -38,6 +38,7 @@ create table task_templates (
   section_id uuid references sections(id) on delete cascade not null,
   text text not null,
   parent_task_id uuid,
+  order_index integer not null default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -51,6 +52,7 @@ create table tasks (
   date date not null,
   template_id uuid references task_templates(id) on delete set null,
   parent_task_id uuid,
+  order_index integer not null default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -103,6 +105,10 @@ create index sections_user_id_idx on sections(user_id);
 create index tasks_user_id_idx on tasks(user_id);
 create index tasks_date_idx on tasks(date);
 create index tasks_section_id_idx on tasks(section_id);
+create index task_templates_user_id_idx on task_templates(user_id);
+create unique index tasks_daily_template_unique
+  on tasks(user_id, date, template_id)
+  where template_id is not null;
 ```
 
 4. Click **Run** (or press Ctrl/Cmd + Enter)
@@ -114,13 +120,13 @@ create index tasks_section_id_idx on tasks(section_id);
 2. Click **API** in the left menu
 3. You'll see two important values:
    - **Project URL**: Something like `https://abcdefgh.supabase.co`
-   - **anon public key**: A long string starting with `eyJ...`
+   - **Publishable key**: A string that may start with `sb_publishable_` or `eyJ...`
 4. **COPY THESE VALUES** - you'll need them next!
 
 ## Step 4: Configure the App
 
-1. Open `todo-app.html` in a text editor
-2. Find these lines (around line 313):
+1. Open `index.html` in a text editor
+2. Find these lines:
 ```javascript
 const SUPABASE_URL = 'YOUR_SUPABASE_URL';
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
@@ -128,13 +134,13 @@ const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 3. Replace with your actual values:
 ```javascript
 const SUPABASE_URL = 'https://abcdefgh.supabase.co';  // Your Project URL
-const SUPABASE_ANON_KEY = 'eyJ...';  // Your anon public key
+const SUPABASE_ANON_KEY = 'sb_publishable_...';  // Your publishable key
 ```
 4. Save the file
 
 ## Step 5: Test Locally
 
-1. Open `todo-app.html` in your web browser (double-click the file)
+1. Open `index.html` in your web browser (double-click the file)
 2. Sign up with your email and password
 3. Check your email for a confirmation link (check spam!)
 4. Click the confirmation link
@@ -146,9 +152,8 @@ const SUPABASE_ANON_KEY = 'eyJ...';  // Your anon public key
 1. Create a new repository on GitHub
 2. Make it **public** (the code is safe to share)
 3. Upload these files:
-   - `todo-app.html`
+   - `index.html`
    - `README.md` (this file)
-   - `LICENSE` (optional)
 
 4. Enable GitHub Pages:
    - Go to Settings > Pages
@@ -156,20 +161,20 @@ const SUPABASE_ANON_KEY = 'eyJ...';  // Your anon public key
    - Branch: main / root
    - Click Save
 
-5. Your app will be live at: `https://yourusername.github.io/todo-app/todo-app.html`
+5. Your app will be live at: `https://yourusername.github.io/to-do/`
 
-## Privacy & Security ✅
+## Privacy & Security
 
 **What's Public:**
-- ✅ The code on GitHub (HTML/CSS/JavaScript)
-- ✅ Your Supabase project URL
-- ✅ Your anon public key (safe to expose)
+- The code on GitHub (HTML/CSS/JavaScript)
+- Your Supabase project URL
+- Your publishable key (safe to expose)
 
 **What's Private:**
-- 🔒 Your actual to-do items and tasks
-- 🔒 Your user credentials
-- 🔒 Your database password
-- 🔒 Nobody can access your data without your login
+- Your actual to-do items and tasks
+- Your user credentials
+- Your database password
+- Nobody can access your data without your login
 
 **How Row Level Security Works:**
 - Each user can ONLY see/edit their own data
@@ -178,12 +183,12 @@ const SUPABASE_ANON_KEY = 'eyJ...';  // Your anon public key
 
 ## Features
 
-✅ **User-defined sections** - Create custom categories (Work, Personal, etc.)  
-✅ **Daily repeating tasks** - Mark tasks to repeat every day  
-✅ **Date display** - Shows current date at top  
-✅ **Auto-archiving** - Completed tasks are tracked by date  
-✅ **Cross-device sync** - Access from phone, tablet, computer  
-✅ **Private & secure** - Only you can see your data  
+- **User-defined sections** - Create custom categories (Work, Personal, etc.)
+- **Daily repeating tasks** - Mark tasks to repeat every day
+- **Date display** - Shows current date at top
+- **Auto-archiving** - Completed tasks are tracked by date
+- **Cross-device sync** - Access from phone, tablet, computer
+- **Private & secure** - Only you can see your data
 
 ## Daily Workflow
 
@@ -207,7 +212,7 @@ If you want repeating tasks to automatically reset each day:
 ## Troubleshooting
 
 **"Invalid API key" error:**
-- Double-check you copied the full anon key from Supabase
+- Double-check you copied the full publishable key from Supabase
 
 **Can't log in:**
 - Check your email for confirmation link
@@ -220,9 +225,9 @@ If you want repeating tasks to automatically reset each day:
 
 ## Step 7: Maintenance & Sync Workflow
 
-To keep your GitHub repository updated with the latest improvements from Gemini:
+To keep your GitHub repository updated with the latest changes:
 
-1. **The Gemini Sync Command**: When you ask me to push changes, I will provide a command like this:
+1. **Sync command**: Run this with a clear commit message:
    ```powershell
    .\sync.bat "feat: description of changes"
    ```
