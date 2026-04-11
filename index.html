@@ -586,6 +586,17 @@
         safeStorage.setItem(`last_init_${userId}`, date);
       }
 
+      async function createDefaultSection(userId) {
+        const { data, error } = await supabase
+          .from("sections")
+          .insert([{ user_id: userId, name: "Tasks", order_index: 0 }])
+          .select("id,user_id,name,order_index")
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
+
       async function loadSections(userIdFromCall, force = false) {
         const userId = userIdFromCall || userRef.current?.id;
         if (!userId) return;
@@ -615,6 +626,12 @@
 
         if (sectionsError) throw sectionsError;
 
+        let availableSections = sectionsData || [];
+
+        if (availableSections.length === 0) {
+          availableSections = [await createDefaultSection(userId)];
+        }
+
         const { data: tasksData, error: tasksError } = await supabase
           .from("tasks")
           .select("id,section_id,user_id,text,completed,date,template_id,parent_task_id,order_index")
@@ -626,30 +643,44 @@
 
         const effectiveTasks = tasksData || [];
 
-        let merged = (sectionsData || []).map((section) => ({
+        let merged = availableSections.map((section) => ({
           ...section,
           tasks: effectiveTasks.filter((task) => String(task.section_id) === String(section.id))
         }));
 
-        const knownSectionIds = new Set((sectionsData || []).map((section) => String(section.id)));
+        const knownSectionIds = new Set(availableSections.map((section) => String(section.id)));
         const orphanTasks = effectiveTasks.filter((task) => !knownSectionIds.has(String(task.section_id)));
 
         if (orphanTasks.length > 0) {
-          merged.push({
-            id: "unsectioned",
-            user_id: userId,
-            name: "Tasks",
-            order_index: Number.MAX_SAFE_INTEGER,
-            tasks: orphanTasks
-          });
+          const fallbackSection = availableSections[0];
+          const movedTasks = orphanTasks.map((task) => ({ ...task, section_id: fallbackSection.id }));
+
+          const movedTaskResults = await Promise.all(orphanTasks.map((task) => (
+            supabase.from("tasks").update({ section_id: fallbackSection.id }).eq("id", task.id)
+          )));
+          const movedTaskError = movedTaskResults.find((result) => result.error)?.error;
+          if (movedTaskError) throw movedTaskError;
+
+          const movedTemplateResults = await Promise.all(orphanTasks
+            .filter((task) => task.template_id)
+            .map((task) => (
+              supabase.from("task_templates").update({ section_id: fallbackSection.id }).eq("id", task.template_id)
+            )));
+          const movedTemplateError = movedTemplateResults.find((result) => result.error)?.error;
+          if (movedTemplateError) throw movedTemplateError;
+
+          merged = merged.map((section, index) => (
+            index === 0
+              ? { ...section, tasks: [...(section.tasks || []), ...movedTasks] }
+              : section
+          ));
         }
 
         if (effectiveTasks.length > 0 && merged.every((section) => (section.tasks || []).length === 0)) {
           merged = [{
-            id: "all-tasks",
+            ...availableSections[0],
             user_id: userId,
             name: "Tasks",
-            order_index: Number.MAX_SAFE_INTEGER,
             tasks: effectiveTasks
           }];
         }
@@ -660,7 +691,7 @@
         setLoadInfo({
           today,
           taskCount: effectiveTasks.length,
-          sectionCount: (sectionsData || []).length,
+          sectionCount: availableSections.length,
           templateBackedCount: effectiveTasks.filter((task) => task.template_id).length
         });
       }
@@ -961,35 +992,37 @@
           )}
 
           {loadInfo && (
-            <div className={`panel ${loadInfo.taskCount === 0 ? "error" : ""}`}>
+            <div className={`panel ${loadInfo.taskCount === 0 ? "gold" : ""}`}>
               Loaded {loadInfo.taskCount} task{loadInfo.taskCount === 1 ? "" : "s"} for {loadInfo.today}.
               {" "}Daily/template-backed: {loadInfo.templateBackedCount}. Sections: {loadInfo.sectionCount}.
             </div>
           )}
 
-          {sections.length === 0 ? (
+          {sections.length === 0 && (
             <div className="panel error">
-              No sections were returned. Create a section, press Refresh, or check Supabase RLS for the sections table.
+              No sections were returned. Press Refresh to create a default section, or check Supabase RLS for the sections table.
             </div>
-          ) : totalTasksToday === 0 ? (
-            <div className="panel error">
-              No tasks found for today. Press Refresh once. If this stays at 0, check task_templates rows and RLS policies.
-            </div>
-          ) : (
-            sections.map((section) => (
-              <div className="panel" key={section.id}>
-                <SectionComponent
-                  user={user}
-                  section={section}
-                  sections={sections}
-                  setSections={setSections}
-                  deleteSection={deleteSection}
-                  moveSection={moveSection}
-                  setError={setError}
-                />
-              </div>
-            ))
           )}
+
+          {sections.length > 0 && totalTasksToday === 0 && (
+            <div className="panel gold">
+              No tasks found for today. Add a task below to get started.
+            </div>
+          )}
+
+          {sections.map((section) => (
+            <div className="panel" key={section.id}>
+              <SectionComponent
+                user={user}
+                section={section}
+                sections={sections}
+                setSections={setSections}
+                deleteSection={deleteSection}
+                moveSection={moveSection}
+                setError={setError}
+              />
+            </div>
+          ))}
         </>
       );
     }
