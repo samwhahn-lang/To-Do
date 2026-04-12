@@ -483,7 +483,11 @@
             try {
               const cached = cache.get(nextUser.id);
               if (cached) setSections(cached);
-              await ensureDailyTasks(getCurrentDate(), nextUser.id);
+              try {
+                await ensureDailyTasks(getCurrentDate(), nextUser.id);
+              } catch (templateErr) {
+                console.warn("ensureDailyTasks skipped:", templateErr.message);
+              }
               await loadSections(nextUser.id, true);
             } catch (e) {
               setError("Failed to load tasks: " + e.message);
@@ -606,6 +610,47 @@
 
         if (error) throw error;
         return data;
+      }
+
+      async function seedTestData(userId) {
+        const today = getCurrentDate();
+        let section;
+
+        const { data: existing } = await supabase
+          .from("sections")
+          .select("id,user_id,name,order_index")
+          .eq("user_id", userId)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          section = existing;
+        } else {
+          section = await createDefaultSection(userId);
+        }
+
+        const sampleTasks = [
+          { text: "Review today's priorities", order_index: 0 },
+          { text: "Check email and respond", order_index: 1 },
+          { text: "Daily standup / sync", order_index: 2 }
+        ];
+
+        const { error: insertError } = await supabase
+          .from("tasks")
+          .insert(sampleTasks.map((t) => ({
+            section_id: section.id,
+            user_id: userId,
+            text: t.text,
+            completed: false,
+            date: today,
+            template_id: null,
+            parent_task_id: null,
+            order_index: t.order_index
+          })));
+
+        if (insertError) throw insertError;
+
+        await loadSections(userId, true);
       }
 
       async function loadSections(userIdFromCall, force = false) {
@@ -779,6 +824,7 @@
             archive={archive}
             showArchive={showArchive}
             loadInfo={loadInfo}
+            seedTestData={seedTestData}
           />
         </>
       );
@@ -864,7 +910,7 @@
       );
     }
 
-    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
+    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo, seedTestData }) {
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
 
@@ -1028,7 +1074,15 @@
 
           {sections.length === 0 && (
             <div className="panel error">
-              No sections were returned. Press Refresh to create a default section, or check Supabase RLS for the sections table.
+              <div style={{ marginBottom: "10px" }}>
+                No sections were returned. Press Refresh to create a default section, or check Supabase RLS for the sections table.
+              </div>
+              <div className="row">
+                <button className="btn" onClick={() => loadSections(user.id, true)}>Refresh</button>
+                <button className="btn gray" onClick={() => seedTestData(user.id).catch((e) => setError("Seed failed: " + e.message))}>
+                  Seed Test Data
+                </button>
+              </div>
             </div>
           )}
 
