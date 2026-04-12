@@ -221,6 +221,17 @@
       white-space: nowrap;
     }
 
+    .badge.type-toggle {
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .badge.type-toggle:hover {
+      background: rgba(212,255,0,.1);
+    }
+
     .check {
       accent-color: var(--lime);
       cursor: pointer;
@@ -697,8 +708,8 @@
       }
 
       async function loadArchive() {
-        if (archive) {
-          setShowArchive(!showArchive);
+        if (showArchive) {
+          setShowArchive(false);
           return;
         }
 
@@ -709,14 +720,7 @@
             return;
           }
 
-          const cached = historyCache.get(currentUser.id);
-          if (cached) {
-            setArchive(cached);
-            setShowArchive(true);
-            return;
-          }
-
-          const { data, error } = await supabase
+          let { data, error } = await supabase
             .from("tasks")
             .select("text,completed,date,template_id,section_id,sections(name)")
             .eq("user_id", currentUser.id)
@@ -725,11 +729,24 @@
             .order("date", { ascending: false })
             .order("order_index", { ascending: true });
 
-          if (error) throw error;
+          if (error) {
+            const fallback = await supabase
+              .from("tasks")
+              .select("text,completed,date,template_id,section_id")
+              .eq("user_id", currentUser.id)
+              .lte("date", getCurrentDate())
+              .gte("date", getDateDaysAgo(7))
+              .order("date", { ascending: false })
+              .order("order_index", { ascending: true });
+
+            if (fallback.error) throw fallback.error;
+            data = (fallback.data || []).map((task) => ({ ...task, sections: null }));
+          }
 
           setArchive(data || []);
           historyCache.set(currentUser.id, data || []);
           setShowArchive(true);
+          setError(null);
         } catch (e) {
           setError("Failed to load archive: " + e.message);
         }
@@ -1082,6 +1099,23 @@
         return false;
       }
 
+      function findTaskBranchIds(rootId) {
+        const ids = new Set([String(rootId)]);
+        let changed = true;
+
+        while (changed) {
+          changed = false;
+          tasks.forEach((task) => {
+            if (task.parent_task_id && ids.has(String(task.parent_task_id)) && !ids.has(String(task.id))) {
+              ids.add(String(task.id));
+              changed = true;
+            }
+          });
+        }
+
+        return ids;
+      }
+
       function findInsertIndexForParent(parentId) {
         const parentIndex = tasks.findIndex((task) => sameId(task.id, parentId));
         if (parentIndex < 0) return tasks.length;
@@ -1205,26 +1239,131 @@
       }
 
       async function deleteTask(taskId) {
-        const task = tasks.find((t) => sameId(t.id, taskId));
+        const branchIds = findTaskBranchIds(taskId);
+        const tasksToDelete = tasks.filter((task) => branchIds.has(String(task.id)));
+        if (tasksToDelete.length === 0) return;
+
+        const templateIds = Array.from(new Set(
+          tasksToDelete
+            .map((task) => task.template_id)
+            .filter(Boolean)
+        ));
+
+        const previousTasks = tasks;
+        applyTasks(tasks.filter((task) => !branchIds.has(String(task.id))));
 
         try {
           const { error } = await supabase
             .from("tasks")
             .delete()
-            .or(`id.eq.${taskId},parent_task_id.eq.${taskId}`);
+            .in("id", Array.from(branchIds))
+            .eq("user_id", user.id);
 
           if (error) throw error;
 
-          if (task?.template_id) {
-            await supabase
+          if (templateIds.length > 0) {
+            const { error: templateError } = await supabase
               .from("task_templates")
               .delete()
-              .or(`id.eq.${task.template_id},parent_task_id.eq.${task.template_id}`);
+              .in("id", templateIds)
+              .eq("user_id", user.id);
+
+            if (templateError) throw templateError;
           }
 
-          applyTasks(tasks.filter((t) => !sameId(t.id, taskId) && !sameId(t.parent_task_id, taskId)));
+          setError(null);
         } catch (e) {
+          applyTasks(previousTasks);
           setError("Failed to delete task: " + e.message);
+        }
+      }
+
+      async function updateTaskType(taskId, nextType) {
+        const task = tasks.find((t) => sameId(t.id, taskId));
+        if (!task) return;
+
+        const isDaily = Boolean(task.template_id);
+        if ((nextType === "daily" && isDaily) || (nextType === "one-time" && !isDaily)) return;
+
+        const previousTasks = tasks;
+
+        if (nextType === "one-time") {
+          applyTasks(tasks.map((t) => sameId(t.id, taskId) ? { ...t, template_id: null } : t));
+
+          try {
+            const { error: taskError } = await supabase
+              .from("tasks")
+              .update({ template_id: null })
+              .eq("id", taskId)
+              .eq("user_id", user.id);
+
+            if (taskError) throw taskError;
+
+            const { error: templateError } = await supabase
+              .from("task_templates")
+              .delete()
+              .eq("id", task.template_id)
+              .eq("user_id", user.id);
+
+            if (templateError) throw templateError;
+
+            setError(null);
+          } catch (e) {
+            applyTasks(previousTasks);
+            setError("Failed to switch task type: " + e.message);
+          }
+
+          return;
+        }
+
+        let newTemplateId = null;
+
+        try {
+          const parentTask = task.parent_task_id
+            ? tasks.find((t) => sameId(t.id, task.parent_task_id))
+            : null;
+          const parentTemplateId = parentTask?.template_id || null;
+
+          const { data: templateData, error: templateError } = await supabase
+            .from("task_templates")
+            .insert([{
+              section_id: task.section_id,
+              user_id: user.id,
+              text: task.text,
+              parent_task_id: parentTemplateId,
+              order_index: task.order_index || 0
+            }])
+            .select("id")
+            .single();
+
+          if (templateError) throw templateError;
+          newTemplateId = templateData.id;
+
+          const { error: taskError } = await supabase
+            .from("tasks")
+            .update({ template_id: newTemplateId })
+            .eq("id", taskId)
+            .eq("user_id", user.id);
+
+          if (taskError) throw taskError;
+
+          applyTasks(tasks.map((t) => (
+            sameId(t.id, taskId) ? { ...t, template_id: newTemplateId } : t
+          )));
+          setError(null);
+        } catch (e) {
+          if (newTemplateId) {
+            try {
+              await supabase
+                .from("task_templates")
+                .delete()
+                .eq("id", newTemplateId)
+                .eq("user_id", user.id);
+            } catch {}
+          }
+
+          applyTasks(previousTasks);
+          setError("Failed to switch task type: " + e.message);
         }
       }
 
@@ -1383,6 +1522,7 @@
                   moveTask={moveTask}
                   updateTaskText={updateTaskText}
                   updateTaskParent={updateTaskParent}
+                  updateTaskType={updateTaskType}
                   startSubtaskFor={startSubtaskFor}
                 />
                 {forcedParentTaskId && sameId(forcedParentTaskId, task.id) && renderTaskComposer(true)}
@@ -1395,7 +1535,7 @@
       );
     }
 
-    function TaskItem({ task, toggleTask, deleteTask, moveTask, updateTaskText, updateTaskParent, startSubtaskFor }) {
+    function TaskItem({ task, toggleTask, deleteTask, moveTask, updateTaskText, updateTaskParent, updateTaskType, startSubtaskFor }) {
       const [editing, setEditing] = useState(false);
       const [text, setText] = useState(task.text);
 
@@ -1446,9 +1586,14 @@
             {task.parent_task_id && (
               <button className="icon" title="Remove parent" onClick={() => updateTaskParent(task.id, null)}>-</button>
             )}
-            <span className={`badge ${task.template_id ? "b1" : "b2"}`}>
+            <button
+              className={`badge type-toggle ${task.template_id ? "b1" : "b2"}`}
+              title={task.template_id ? "Switch to one-time" : "Switch to daily"}
+              type="button"
+              onClick={() => updateTaskType(task.id, task.template_id ? "one-time" : "daily")}
+            >
               {task.template_id ? "Daily" : "One-Time"}
-            </span>
+            </button>
             <button className="icon" title="Delete task" onClick={() => deleteTask(task.id)}>{"\u00D7"}</button>
           </div>
         </li>
