@@ -720,28 +720,39 @@
             return;
           }
 
-          let { data, error } = await supabase
+          const { data: rawTasks, error: taskError } = await supabase
             .from("tasks")
-            .select("text,completed,date,template_id,section_id,sections(name)")
+            .select("text,completed,date,template_id,section_id")
             .eq("user_id", currentUser.id)
             .lte("date", getCurrentDate())
-            .gte("date", getDateDaysAgo(7))
-            .order("date", { ascending: false })
-            .order("order_index", { ascending: true });
+            .gte("date", getDateDaysAgo(30))
+            .order("date", { ascending: false });
 
-          if (error) {
-            const fallback = await supabase
-              .from("tasks")
-              .select("text,completed,date,template_id,section_id")
+          if (taskError) throw taskError;
+
+          const sectionIds = Array.from(new Set(
+            (rawTasks || []).map((task) => task.section_id).filter(Boolean)
+          ));
+          const sectionNames = {};
+
+          if (sectionIds.length > 0) {
+            const { data: sectionData } = await supabase
+              .from("sections")
+              .select("id,name")
               .eq("user_id", currentUser.id)
-              .lte("date", getCurrentDate())
-              .gte("date", getDateDaysAgo(7))
-              .order("date", { ascending: false })
-              .order("order_index", { ascending: true });
+              .in("id", sectionIds);
 
-            if (fallback.error) throw fallback.error;
-            data = (fallback.data || []).map((task) => ({ ...task, sections: null }));
+            (sectionData || []).forEach((section) => {
+              sectionNames[String(section.id)] = section.name;
+            });
           }
+
+          const data = (rawTasks || [])
+            .map((task) => ({
+              ...task,
+              sections: { name: sectionNames[String(task.section_id)] || "Tasks" }
+            }))
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
           setArchive(data || []);
           historyCache.set(currentUser.id, data || []);
@@ -1339,6 +1350,10 @@
           if (templateError) throw templateError;
           newTemplateId = templateData.id;
 
+          applyTasks(tasks.map((t) => (
+            sameId(t.id, taskId) ? { ...t, template_id: newTemplateId } : t
+          )));
+
           const { error: taskError } = await supabase
             .from("tasks")
             .update({ template_id: newTemplateId })
@@ -1347,9 +1362,6 @@
 
           if (taskError) throw taskError;
 
-          applyTasks(tasks.map((t) => (
-            sameId(t.id, taskId) ? { ...t, template_id: newTemplateId } : t
-          )));
           setError(null);
         } catch (e) {
           if (newTemplateId) {
