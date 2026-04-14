@@ -73,6 +73,10 @@
       border-left-color: var(--gold);
     }
 
+    .panel.cyan {
+      border-left-color: var(--cyan);
+    }
+
     .bar {
       align-items: center;
       background: var(--panel);
@@ -108,8 +112,17 @@
       color: var(--muted);
     }
 
+    .btn.cyan {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
     .btn:hover {
       background: rgba(212,255,0,.1);
+    }
+
+    .btn.cyan:hover {
+      background: rgba(0,255,245,.08);
     }
 
     .in {
@@ -273,6 +286,19 @@
       margin-bottom: 6px;
     }
 
+    .learning-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .learn-item {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
     @media (max-width: 700px) {
       #root { padding: 14px 8px; }
 
@@ -316,6 +342,10 @@
 
       .subtask-form {
         margin-left: 10px;
+      }
+
+      .learning-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -437,9 +467,200 @@
       }
     };
 
-    function App() {
-      return <MainApp />;
+    const learningCache = {
+      get(uid) {
+        try {
+          const raw = safeStorage.getItem(`todo_learning_${uid}`);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return parsed.date === getCurrentDate() ? parsed.payload : null;
+        } catch {
+          return null;
+        }
+      },
+      set(uid, payload) {
+        try {
+          safeStorage.setItem(`todo_learning_${uid}`, JSON.stringify({
+            date: getCurrentDate(),
+            payload
+          }));
+        } catch {}
+      },
+      clear(uid) {
+        try { safeStorage.removeItem(`todo_learning_${uid}`); } catch {}
+      }
+    };
+
+    function pickRandom(pool, count) {
+      const shuffled = [...pool];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled.slice(0, count);
     }
+
+    const IDIOM_POOL = [
+      { phrase: "A blessing in disguise", meaning: "Something that seems bad at first but turns out to be good" },
+      { phrase: "A dime a dozen", meaning: "Very common and of little value" },
+      { phrase: "A penny for your thoughts", meaning: "Asking someone what they are thinking about" },
+      { phrase: "Actions speak louder than words", meaning: "What you do matters more than what you say" },
+      { phrase: "Add fuel to the fire", meaning: "To worsen an already bad situation" },
+      { phrase: "All ears", meaning: "Fully listening and paying close attention" },
+      { phrase: "Barking up the wrong tree", meaning: "Looking in the wrong place or accusing the wrong person" },
+      { phrase: "Beat around the bush", meaning: "Avoiding the main topic or point" },
+      { phrase: "Bite off more than you can chew", meaning: "Taking on more responsibility than you can handle" },
+      { phrase: "Bite the bullet", meaning: "Enduring a painful or difficult situation with courage" },
+      { phrase: "Break a leg", meaning: "A way of wishing someone good luck" },
+      { phrase: "Break the ice", meaning: "To initiate conversation in a social setting" },
+      { phrase: "Burn bridges", meaning: "To permanently damage a relationship or opportunity" },
+      { phrase: "Burning the midnight oil", meaning: "Working very late into the night" },
+      { phrase: "Call it a day", meaning: "To stop working for the rest of the day" },
+      { phrase: "Caught red-handed", meaning: "Discovered in the act of doing something wrong" },
+      { phrase: "Cost an arm and a leg", meaning: "Something that is very expensive" },
+      { phrase: "Cut corners", meaning: "To do something the easy way, sacrificing quality" },
+      { phrase: "Don't bite the hand that feeds you", meaning: "Don't mistreat those who provide for or help you" },
+      { phrase: "Don't judge a book by its cover", meaning: "Don't judge something or someone by appearances alone" },
+      { phrase: "Every cloud has a silver lining", meaning: "Every bad situation has something positive to take from it" },
+      { phrase: "Face the music", meaning: "To accept the consequences of your actions" },
+      { phrase: "Get out of hand", meaning: "To lose control of a situation" },
+      { phrase: "Give the benefit of the doubt", meaning: "To trust someone in a situation where certainty is not possible" },
+      { phrase: "Go back to the drawing board", meaning: "Start something over again from the beginning" },
+      { phrase: "Hit the nail on the head", meaning: "To describe exactly what is causing a situation or problem" },
+      { phrase: "Hit the sack", meaning: "To go to bed or go to sleep" },
+      { phrase: "Jump on the bandwagon", meaning: "To follow a trend or popular activity" },
+      { phrase: "Keep your chin up", meaning: "Remain cheerful in a difficult situation" },
+      { phrase: "Kill two birds with one stone", meaning: "To accomplish two things with a single action" },
+      { phrase: "Let sleeping dogs lie", meaning: "To avoid bringing up a topic that could cause trouble" },
+      { phrase: "Miss the boat", meaning: "To miss an opportunity" },
+      { phrase: "No pain, no gain", meaning: "Hard work leads to success; you have to suffer to improve" },
+      { phrase: "On the ball", meaning: "Alert, effective, and efficient" },
+      { phrase: "Once in a blue moon", meaning: "Something that happens very rarely" },
+      { phrase: "Over the moon", meaning: "Extremely happy or delighted" },
+      { phrase: "Piece of cake", meaning: "Something that is very easy to do" },
+      { phrase: "Pull someone's leg", meaning: "To joke or tease someone" },
+      { phrase: "Put all your eggs in one basket", meaning: "To risk everything on a single venture" },
+      { phrase: "See eye to eye", meaning: "To agree with someone" },
+      { phrase: "Sit on the fence", meaning: "To avoid taking sides in a dispute" },
+      { phrase: "Spill the beans", meaning: "To reveal secret or confidential information" },
+      { phrase: "The ball is in your court", meaning: "It is your decision or your turn to take action" },
+      { phrase: "The best of both worlds", meaning: "Enjoying two different advantages at the same time" },
+      { phrase: "Throw in the towel", meaning: "To admit defeat or give up on something" },
+      { phrase: "Under the weather", meaning: "Feeling ill or unwell" },
+      { phrase: "Up in the air", meaning: "Uncertain or undecided" },
+      { phrase: "Wrap your head around something", meaning: "To understand something complex or difficult" },
+      { phrase: "You can't have your cake and eat it too", meaning: "You must choose; you cannot have everything at once" },
+      { phrase: "Zip your lips", meaning: "To stay silent or keep a secret" },
+      { phrase: "Bite the dust", meaning: "To fail, be defeated, or die" },
+      { phrase: "Blow off steam", meaning: "To release pent-up anger or frustration" },
+      { phrase: "Chew the fat", meaning: "To have a long, friendly conversation" },
+      { phrase: "Come rain or shine", meaning: "No matter what happens or what the circumstances are" },
+      { phrase: "Draw a blank", meaning: "To be unable to remember or think of something" },
+      { phrase: "Easier said than done", meaning: "Something is harder to achieve than it is to talk about" },
+      { phrase: "Fly off the handle", meaning: "To suddenly lose your temper" },
+      { phrase: "Get cold feet", meaning: "To suddenly become nervous about something you had planned to do" },
+      { phrase: "Get the ball rolling", meaning: "To start an activity or process" },
+      { phrase: "Give someone the cold shoulder", meaning: "To deliberately ignore someone" },
+      { phrase: "Go the extra mile", meaning: "To put in more effort than is expected or required" },
+      { phrase: "Hang in there", meaning: "To continue despite difficulty; to persevere" },
+      { phrase: "In hot water", meaning: "In trouble or in a difficult situation" },
+      { phrase: "It takes two to tango", meaning: "Both people involved in a situation are equally responsible" },
+      { phrase: "Jump to conclusions", meaning: "To make a decision without having all the facts" },
+      { phrase: "Keep a low profile", meaning: "To avoid attracting attention to yourself" },
+      { phrase: "Leave no stone unturned", meaning: "To try every possible approach to accomplish something" },
+      { phrase: "Look before you leap", meaning: "Think carefully before taking action" },
+      { phrase: "The cat's out of the bag", meaning: "A secret has been accidentally revealed" },
+      { phrase: "Steal someone's thunder", meaning: "To take attention or praise that should belong to someone else" },
+    ];
+
+    const VOCAB_POOL = [
+      { word: "Aberrant", pos: "adj.", definition: "Departing from the normal or expected; unusual" },
+      { word: "Abstruse", pos: "adj.", definition: "Difficult to understand; obscure" },
+      { word: "Acrimony", pos: "n.", definition: "Bitterness or ill feeling in speech or manner" },
+      { word: "Ameliorate", pos: "v.", definition: "To make something bad or unsatisfactory better; improve" },
+      { word: "Anachronism", pos: "n.", definition: "Something placed outside its correct historical time" },
+      { word: "Anathema", pos: "n.", definition: "Something or someone that is strongly disliked or detested" },
+      { word: "Antipathy", pos: "n.", definition: "A deep-seated feeling of aversion or dislike" },
+      { word: "Arcane", pos: "adj.", definition: "Understood by few; mysterious or secret" },
+      { word: "Arduous", pos: "adj.", definition: "Involving or requiring great effort; difficult and tiring" },
+      { word: "Assiduous", pos: "adj.", definition: "Showing great care, attention, and effort; diligent" },
+      { word: "Audacious", pos: "adj.", definition: "Showing a willingness to take bold risks; daring" },
+      { word: "Avarice", pos: "n.", definition: "Extreme greed for wealth or material gain" },
+      { word: "Banal", pos: "adj.", definition: "Lacking originality; predictably ordinary" },
+      { word: "Belligerent", pos: "adj.", definition: "Hostile and aggressive; inclined to argue or fight" },
+      { word: "Capricious", pos: "adj.", definition: "Given to sudden and unpredictable changes of mood or behavior" },
+      { word: "Caustic", pos: "adj.", definition: "Sarcastic and scathing in a way that is hurtful" },
+      { word: "Circumspect", pos: "adj.", definition: "Wary and cautious; unwilling to take risks" },
+      { word: "Clandestine", pos: "adj.", definition: "Kept secret, especially for illicit or subversive reasons" },
+      { word: "Cogent", pos: "adj.", definition: "Clear, logical, and convincing; powerfully persuasive" },
+      { word: "Complacent", pos: "adj.", definition: "Showing uncritical satisfaction with oneself; self-satisfied" },
+      { word: "Contentious", pos: "adj.", definition: "Causing or likely to cause controversy; argumentative" },
+      { word: "Copious", pos: "adj.", definition: "Abundant in supply or quantity; plentiful" },
+      { word: "Culpable", pos: "adj.", definition: "Deserving blame for a fault or wrong; guilty" },
+      { word: "Deleterious", pos: "adj.", definition: "Causing harm or damage; injurious to health or well-being" },
+      { word: "Denigrate", pos: "v.", definition: "To criticize unfairly; to belittle or disparage" },
+      { word: "Diffident", pos: "adj.", definition: "Modest or shy due to a lack of self-confidence" },
+      { word: "Discerning", pos: "adj.", definition: "Having or showing good judgment; perceptive and astute" },
+      { word: "Disparate", pos: "adj.", definition: "Essentially different in kind; not able to be compared" },
+      { word: "Ebullient", pos: "adj.", definition: "Cheerful and full of energy; exuberant" },
+      { word: "Egregious", pos: "adj.", definition: "Outstandingly bad; shockingly obvious" },
+      { word: "Ephemeral", pos: "adj.", definition: "Lasting for a very short time; fleeting" },
+      { word: "Equivocal", pos: "adj.", definition: "Open to more than one interpretation; ambiguous" },
+      { word: "Esoteric", pos: "adj.", definition: "Understood by only a few with specialized knowledge" },
+      { word: "Exacerbate", pos: "v.", definition: "To make a problem, situation, or feeling worse" },
+      { word: "Fastidious", pos: "adj.", definition: "Very attentive to accuracy and detail; meticulous" },
+      { word: "Furtive", pos: "adj.", definition: "Attempting to avoid notice; secretive and sly" },
+      { word: "Garrulous", pos: "adj.", definition: "Excessively talkative, especially on trivial matters" },
+      { word: "Gratuitous", pos: "adj.", definition: "Uncalled for; lacking good reason; unwarranted" },
+      { word: "Gregarious", pos: "adj.", definition: "Fond of company; sociable" },
+      { word: "Hubris", pos: "n.", definition: "Excessive pride or self-confidence, often leading to downfall" },
+      { word: "Iconoclast", pos: "n.", definition: "A person who attacks or rejects established beliefs or institutions" },
+      { word: "Impetuous", pos: "adj.", definition: "Acting or done quickly and without careful thought; impulsive" },
+      { word: "Indolent", pos: "adj.", definition: "Wanting to avoid activity or exertion; lazy" },
+      { word: "Ineffable", pos: "adj.", definition: "Too great or extreme to be expressed in words" },
+      { word: "Insipid", pos: "adj.", definition: "Lacking vigor, interest, or strong flavor; dull and bland" },
+      { word: "Intrepid", pos: "adj.", definition: "Fearless and adventurous; bold and brave" },
+      { word: "Inveterate", pos: "adj.", definition: "Having a habit too firmly established to change" },
+      { word: "Judicious", pos: "adj.", definition: "Having, showing, or done with good judgment; wise" },
+      { word: "Laconic", pos: "adj.", definition: "Using very few words; brief and concise in speech" },
+      { word: "Loquacious", pos: "adj.", definition: "Tending to talk a great deal; talkative" },
+      { word: "Magnanimous", pos: "adj.", definition: "Generous or forgiving, especially toward a rival or enemy" },
+      { word: "Malevolent", pos: "adj.", definition: "Having or showing a wish to do evil to others" },
+      { word: "Mendacious", pos: "adj.", definition: "Not telling the truth; lying; dishonest" },
+      { word: "Mercurial", pos: "adj.", definition: "Subject to sudden or unpredictable changes of mood" },
+      { word: "Meticulous", pos: "adj.", definition: "Showing great attention to detail; very careful and precise" },
+      { word: "Mitigate", pos: "v.", definition: "To make less severe, serious, or painful; to lessen" },
+      { word: "Nefarious", pos: "adj.", definition: "Wicked or criminal; flagrantly immoral" },
+      { word: "Obfuscate", pos: "v.", definition: "To make unclear, confusing, or difficult to understand" },
+      { word: "Obsequious", pos: "adj.", definition: "Excessively eager to serve or please; fawning" },
+      { word: "Obstinate", pos: "adj.", definition: "Stubbornly refusing to change one's opinion or course of action" },
+      { word: "Onerous", pos: "adj.", definition: "Involving a great deal of effort, trouble, or difficulty" },
+      { word: "Ostentatious", pos: "adj.", definition: "Characterized by a vulgar or pretentious display; showy" },
+      { word: "Parsimonious", pos: "adj.", definition: "Unwilling to spend money or use resources; miserly" },
+      { word: "Pedantic", pos: "adj.", definition: "Excessively concerned with minor details or rules" },
+      { word: "Perfidious", pos: "adj.", definition: "Deceitful and untrustworthy; guilty of betrayal" },
+      { word: "Pernicious", pos: "adj.", definition: "Having a harmful effect, especially in a gradual or subtle way" },
+      { word: "Placate", pos: "v.", definition: "To make someone less angry or hostile; to appease" },
+      { word: "Pragmatic", pos: "adj.", definition: "Dealing with things sensibly and realistically; practical" },
+      { word: "Precarious", pos: "adj.", definition: "Not securely held; uncertain or risky" },
+      { word: "Prodigious", pos: "adj.", definition: "Remarkably great in extent, size, or degree; impressive" },
+      { word: "Prolific", pos: "adj.", definition: "Producing many works, results, or offspring; highly productive" },
+      { word: "Querulous", pos: "adj.", definition: "Complaining in a petulant or whining manner" },
+      { word: "Recalcitrant", pos: "adj.", definition: "Having an obstinately uncooperative attitude; stubbornly defiant" },
+      { word: "Reticent", pos: "adj.", definition: "Not revealing one's thoughts or feelings readily; reserved" },
+      { word: "Sagacious", pos: "adj.", definition: "Having or showing keen mental discernment and wisdom" },
+      { word: "Sanguine", pos: "adj.", definition: "Optimistic, especially in a difficult situation" },
+      { word: "Sedulous", pos: "adj.", definition: "Showing dedication and diligence; hardworking and persevering" },
+      { word: "Sycophant", pos: "n.", definition: "A person who acts obsequiously toward those in power; a flatterer" },
+      { word: "Temerity", pos: "n.", definition: "Excessive confidence or boldness; reckless audacity" },
+      { word: "Tenacious", pos: "adj.", definition: "Holding firmly to an opinion or course; persistent" },
+      { word: "Truculent", pos: "adj.", definition: "Eager or quick to argue or fight; aggressively defiant" },
+      { word: "Umbrage", pos: "n.", definition: "Offense or annoyance taken at a perceived slight" },
+      { word: "Vacuous", pos: "adj.", definition: "Having or showing a lack of thought or intelligence; empty" },
+      { word: "Verbose", pos: "adj.", definition: "Using or containing more words than necessary; wordy" },
+      { word: "Vindictive", pos: "adj.", definition: "Having or showing a strong desire for revenge" },
+      { word: "Zealous", pos: "adj.", definition: "Having or showing great energy or enthusiasm in pursuit of a cause" },
+    ];
 
     const TEST_SECTIONS = [
       {
@@ -458,6 +679,10 @@
         ]
       }
     ];
+
+    function App() {
+      return <MainApp />;
+    }
 
     function MainApp() {
       const [user, setUser] = useState(null);
@@ -491,6 +716,7 @@
           if (event === "SIGNED_OUT") {
             if (userRef.current?.id) cache.clear(userRef.current.id);
             if (userRef.current?.id) historyCache.clear(userRef.current.id);
+            if (userRef.current?.id) learningCache.clear(userRef.current.id);
             setSections([]);
             setArchive(null);
             setShowArchive(false);
@@ -521,6 +747,7 @@
           try {
             cache.clear(uid);
             historyCache.clear(uid);
+            learningCache.clear(uid);
             await ensureDailyTasks(currentDate, uid);
             await loadSections(uid, true);
             setArchive(null);
@@ -946,7 +1173,6 @@
         return acc;
       }, {});
 
-      // Sort days descending (most recent first), sections alphabetically within each day
       const sortedArchiveDays = Object.entries(groupedArchive)
         .sort(([a], [b]) => b.localeCompare(a))
         .map(([day, items]) => {
@@ -1147,7 +1373,152 @@
               />
             </div>
           ))}
+
+          <LearningPanel user={user} />
         </>
+      );
+    }
+
+    function LearningPanel({ user }) {
+      const [data, setData] = useState(null);
+      const [status, setStatus] = useState("loading");
+      const [collapsed, setCollapsed] = useState(false);
+      const [generating, setGenerating] = useState(false);
+      const [errMsg, setErrMsg] = useState(null);
+
+      useEffect(() => { loadLearning(false); }, []);
+
+      async function loadLearning(forceNew) {
+        setErrMsg(null);
+        if (forceNew) {
+          setGenerating(true);
+        } else {
+          setStatus("loading");
+        }
+
+        const today = getCurrentDate();
+
+        if (!forceNew) {
+          const cached = learningCache.get(user.id);
+          if (cached) {
+            setData(cached);
+            setStatus("ready");
+            return;
+          }
+
+          const { data: existing, error: fetchErr } = await supabase
+            .from("daily_learning")
+            .select("idioms,vocab")
+            .eq("user_id", user.id)
+            .eq("date", today)
+            .maybeSingle();
+
+          if (fetchErr) {
+            setErrMsg("Could not load learning data: " + fetchErr.message);
+            setStatus("error");
+            return;
+          }
+
+          if (existing) {
+            const payload = { idioms: existing.idioms, vocab: existing.vocab };
+            setData(payload);
+            learningCache.set(user.id, payload);
+            setStatus("ready");
+            return;
+          }
+        }
+
+        const idioms = pickRandom(IDIOM_POOL, 10);
+        const vocab = pickRandom(VOCAB_POOL, 10);
+        const payload = { idioms, vocab };
+
+        const { error: upsertErr } = await supabase
+          .from("daily_learning")
+          .upsert(
+            { user_id: user.id, date: today, idioms, vocab, updated_at: new Date().toISOString() },
+            { onConflict: "user_id,date" }
+          );
+
+        if (upsertErr) {
+          setErrMsg("Could not save learning data: " + upsertErr.message);
+        }
+
+        setData(payload);
+        learningCache.set(user.id, payload);
+        setStatus("ready");
+        setGenerating(false);
+      }
+
+      return (
+        <div className="panel cyan">
+          <div className="section-head">
+            <div className="section-title" style={{ color: "var(--cyan)" }}>Learning</div>
+            <div className="meta">
+              <button
+                className="btn cyan"
+                style={{ fontSize: "11px", padding: "4px 10px" }}
+                disabled={generating}
+                onClick={() => loadLearning(true)}
+              >
+                {generating ? "Generating..." : "Generate New"}
+              </button>
+              <button className="icon" onClick={() => setCollapsed((v) => !v)}>
+                {collapsed ? "+" : "\u2212"}
+              </button>
+            </div>
+          </div>
+
+          {!collapsed && (
+            <>
+              {status === "loading" && (
+                <div style={{ color: "var(--muted)", padding: "8px 0" }}>Loading today's learning content...</div>
+              )}
+              {errMsg && (
+                <div style={{ color: "var(--red)", marginBottom: "10px", fontSize: "12px" }}>{errMsg}</div>
+              )}
+              {status === "ready" && data && (
+                <div className="learning-grid">
+                  <div>
+                    <div style={{ color: "var(--gold)", fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", marginBottom: "8px", textTransform: "uppercase" }}>
+                      Idioms of the Day
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {(data.idioms || []).map((item, i) => (
+                        <div key={i} className="learn-item">
+                          <div style={{ color: "var(--cyan)", fontWeight: 700, fontSize: "13px", marginBottom: "3px" }}>
+                            {item.phrase}
+                          </div>
+                          <div style={{ color: "var(--muted)", fontSize: "12px", lineHeight: "1.45" }}>
+                            {item.meaning}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: "var(--gold)", fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", marginBottom: "8px", textTransform: "uppercase" }}>
+                      Vocabulary of the Day
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {(data.vocab || []).map((item, i) => (
+                        <div key={i} className="learn-item">
+                          <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "3px" }}>
+                            <span style={{ color: "var(--lime)", fontWeight: 700, fontSize: "13px" }}>{item.word}</span>
+                            <span style={{ color: "var(--muted)", fontSize: "10px", fontStyle: "italic" }}>{item.pos}</span>
+                          </div>
+                          <div style={{ color: "var(--muted)", fontSize: "12px", lineHeight: "1.45" }}>
+                            {item.definition}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       );
     }
 
