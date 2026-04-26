@@ -121,6 +121,11 @@
       background: rgba(212,255,0,.1);
     }
 
+    .btn:disabled {
+      cursor: default;
+      opacity: .35;
+    }
+
     .btn.cyan:hover {
       background: rgba(0,255,245,.08);
     }
@@ -876,23 +881,6 @@
       { word: "Wily", pos: "adj.", definition: "Skilled at gaining an advantage, especially deceitfully; cunning" },
     ];
 
-    const TEST_SECTIONS = [
-      {
-        id: "test-1", user_id: "test", name: "Test Section", order_index: 0,
-        tasks: [
-          { id: "task-1", section_id: "test-1", text: "Buy groceries", completed: false, date: getCurrentDate(), template_id: null, parent_task_id: null, order_index: 0 },
-          { id: "task-2", section_id: "test-1", text: "Send weekly report", completed: true, date: getCurrentDate(), template_id: "tpl-1", parent_task_id: null, order_index: 1 },
-          { id: "task-3", section_id: "test-1", text: "Review pull requests", completed: false, date: getCurrentDate(), template_id: null, parent_task_id: null, order_index: 2 },
-        ]
-      },
-      {
-        id: "test-2", user_id: "test", name: "Work", order_index: 1,
-        tasks: [
-          { id: "task-4", section_id: "test-2", text: "Daily standup", completed: true, date: getCurrentDate(), template_id: "tpl-2", parent_task_id: null, order_index: 0 },
-          { id: "task-5", section_id: "test-2", text: "Update project board", completed: false, date: getCurrentDate(), template_id: null, parent_task_id: null, order_index: 1 },
-        ]
-      }
-    ];
 
     function App() {
       return <MainApp />;
@@ -903,7 +891,6 @@
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState(null);
       const [sections, setSections] = useState([]);
-      const [testMode, setTestMode] = useState(false);
       const [archive, setArchive] = useState(null);
       const [showArchive, setShowArchive] = useState(false);
       const [loadInfo, setLoadInfo] = useState(null);
@@ -941,12 +928,9 @@
           if (nextUser) {
             const cached = cache.get(nextUser.id);
             if (cached) setSections(cached);
-            // Always force-load from Supabase on page load — skip cache
-            loadSections(nextUser.id, true).catch((e) => setError("Failed to load: " + e.message));
-            // Run template init in background after initial paint
             ensureDailyTasks(getCurrentDate(), nextUser.id)
-              .then(() => loadSections(nextUser.id, true))
-              .catch((e) => console.warn("ensureDailyTasks:", e.message));
+              .catch((e) => console.warn("ensureDailyTasks:", e.message))
+              .finally(() => loadSections(nextUser.id, true).catch((e) => setError("Failed to load: " + e.message)));
           }
         });
 
@@ -1066,47 +1050,6 @@
 
         if (error) throw error;
         return data;
-      }
-
-      async function seedTestData(userId) {
-        const today = getCurrentDate();
-        let section;
-
-        const { data: existing } = await supabase
-          .from("sections")
-          .select("id,user_id,name,order_index")
-          .eq("user_id", userId)
-          .limit(1)
-          .maybeSingle();
-
-        if (existing) {
-          section = existing;
-        } else {
-          section = await createDefaultSection(userId);
-        }
-
-        const sampleTasks = [
-          { text: "Review today's priorities", order_index: 0 },
-          { text: "Check email and respond", order_index: 1 },
-          { text: "Daily standup / sync", order_index: 2 }
-        ];
-
-        const { error: insertError } = await supabase
-          .from("tasks")
-          .insert(sampleTasks.map((t) => ({
-            section_id: section.id,
-            user_id: userId,
-            text: t.text,
-            completed: false,
-            date: today,
-            template_id: null,
-            parent_task_id: null,
-            order_index: t.order_index
-          })));
-
-        if (insertError) throw insertError;
-
-        await loadSections(userId, true);
       }
 
       async function loadSections(userIdFromCall, force = false) {
@@ -1271,7 +1214,7 @@
           {error && <div className="panel error">{error}</div>}
           <TaskApp
             user={user}
-            sections={testMode ? TEST_SECTIONS : sections}
+            sections={sections}
             setSections={setSections}
             setError={setError}
             loadSections={loadSections}
@@ -1279,9 +1222,6 @@
             archive={archive}
             showArchive={showArchive}
             loadInfo={loadInfo}
-            seedTestData={seedTestData}
-            testMode={testMode}
-            setTestMode={setTestMode}
           />
         </>
       );
@@ -1367,9 +1307,25 @@
       );
     }
 
-    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo, seedTestData, testMode, setTestMode }) {
+    function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
+      const [undoStack, setUndoStack] = useState([]);
+
+      function pushUndo(label, undoFn) {
+        setUndoStack(prev => [...prev.slice(-4), { label, undo: undoFn }]);
+      }
+
+      async function applyUndo() {
+        if (undoStack.length === 0) return;
+        const top = undoStack[undoStack.length - 1];
+        setUndoStack(prev => prev.slice(0, -1));
+        try {
+          await top.undo();
+        } catch (e) {
+          setError("Undo failed: " + e.message);
+        }
+      }
 
       const todayPretty = new Date().toLocaleDateString("en-US", {
         weekday: "long",
@@ -1478,10 +1434,11 @@
               <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
               <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
               <button
-                className={`btn ${testMode ? "" : "gray"}`}
-                onClick={() => setTestMode((v) => !v)}
-                title="Toggle fake local data to verify UI rendering"
-              >{testMode ? "Exit Test Mode" : "Test Mode"}</button>
+                className="btn gray"
+                onClick={applyUndo}
+                disabled={undoStack.length === 0}
+                title={undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].label}` : "Nothing to undo"}
+              >Undo{undoStack.length > 0 ? ` (${undoStack.length})` : ""}</button>
             </div>
             <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
           </div>
@@ -1553,18 +1510,9 @@
             </div>
           )}
 
-          {sections.length === 0 && !testMode && (
-            <div className="panel error">
-              <div style={{ marginBottom: "10px" }}>
-                No sections loaded. Click <strong>Test Mode</strong> to verify the UI with fake data, <strong>Refresh</strong> to retry loading, or <strong>Seed Test Data</strong> to insert sample data into Supabase.
-              </div>
-              <div className="row">
-                <button className="btn" onClick={() => setTestMode(true)}>Test Mode</button>
-                <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
-                <button className="btn gray" onClick={() => seedTestData(user.id).catch((e) => setError("Seed failed: " + e.message))}>
-                  Seed Test Data
-                </button>
-              </div>
+          {sections.length === 0 && (
+            <div className="panel gold">
+              No sections found. Use <strong>+ New Section</strong> to create one, or <strong>Refresh</strong> to retry.
             </div>
           )}
 
@@ -1584,6 +1532,7 @@
                 deleteSection={deleteSection}
                 moveSection={moveSection}
                 setError={setError}
+                pushUndo={pushUndo}
               />
             </div>
           ))}
@@ -1737,16 +1686,18 @@
       );
     }
 
-    function SectionComponent({ user, section, sections, setSections, deleteSection, moveSection, setError }) {
+    function SectionComponent({ user, section, sections, setSections, deleteSection, moveSection, setError, pushUndo }) {
       const [tasks, setTasks] = useState(section.tasks || []);
       const [newTaskText, setNewTaskText] = useState("");
       const [taskType, setTaskType] = useState("daily");
       const [isSubtaskMode, setIsSubtaskMode] = useState(false);
       const [forcedParentTaskId, setForcedParentTaskId] = useState(null);
       const newTaskInputRef = useRef(null);
+      const sectionsRef = useRef(sections);
       const today = getCurrentDate();
 
       useEffect(() => setTasks(section.tasks || []), [section.tasks]);
+      useEffect(() => { sectionsRef.current = sections; }, [sections]);
 
       function sameId(a, b) {
         return String(a) === String(b);
@@ -1754,7 +1705,7 @@
 
       function applyTasks(nextTasks) {
         setTasks(nextTasks);
-        const nextSections = sections.map((s) => (
+        const nextSections = sectionsRef.current.map((s) => (
           String(s.id) === String(section.id) ? { ...s, tasks: nextTasks } : s
         ));
         setSections(nextSections);
@@ -1831,6 +1782,8 @@
         const text = newTaskText.trim();
         if (!text) return;
 
+        const previousTasks = tasks;
+
         const last = tasks[tasks.length - 1];
         const parentTaskId = forcedParentTaskId || (isSubtaskMode && last ? (last.parent_task_id || last.id) : null);
         const parentTask = parentTaskId ? tasks.find((task) => sameId(task.id, parentTaskId)) : null;
@@ -1896,6 +1849,14 @@
           applyTasks(normalized);
           await persistTaskOrder(normalized);
 
+          pushUndo(`Add "${text}"`, async () => {
+            await supabase.from("tasks").delete().eq("id", createdTask.id).eq("user_id", user.id);
+            if (createdTask.template_id) {
+              await supabase.from("task_templates").delete().eq("id", createdTask.template_id).eq("user_id", user.id);
+            }
+            applyTasks(previousTasks);
+          });
+
           setNewTaskText("");
           setIsSubtaskMode(false);
           setForcedParentTaskId(null);
@@ -1909,6 +1870,12 @@
         const nextTasks = tasks.map((task) => (
           sameId(task.id, taskId) ? { ...task, completed } : task
         ));
+
+        const taskText = previousTasks.find(t => sameId(t.id, taskId))?.text ?? '';
+        pushUndo(`${completed ? "Complete" : "Uncomplete"} "${taskText}"`, async () => {
+          await supabase.from("tasks").update({ completed: !completed }).eq("id", taskId).eq("user_id", user.id);
+          applyTasks(previousTasks);
+        });
 
         applyTasks(nextTasks);
 
@@ -1942,8 +1909,27 @@
             .filter(Boolean)
         ));
 
+        let templatesToRestore = [];
+        if (templateIds.length > 0) {
+          const { data } = await supabase
+            .from("task_templates")
+            .select("*")
+            .in("id", templateIds)
+            .eq("user_id", user.id);
+          templatesToRestore = data || [];
+        }
+
         const previousTasks = tasks;
         applyTasks(tasks.filter((task) => !branchIds.has(String(task.id))));
+
+        const rootText = tasksToDelete.find(t => sameId(t.id, taskId))?.text ?? "task";
+        pushUndo(`Delete "${rootText}"`, async () => {
+          if (templatesToRestore.length > 0) {
+            await supabase.from("task_templates").insert(templatesToRestore);
+          }
+          await supabase.from("tasks").insert(tasksToDelete.map(t => ({ ...t, user_id: user.id })));
+          applyTasks(previousTasks);
+        });
 
         try {
           const { error } = await supabase
@@ -2096,6 +2082,7 @@
       }
 
       async function moveTask(taskId, direction) {
+        const previousNormalized = reindexTasks([...tasks]);
         const blockStart = tasks.findIndex((task) => sameId(task.id, taskId));
         if (blockStart < 0) return;
 
@@ -2116,6 +2103,12 @@
 
         const normalized = reindexTasks(next);
         applyTasks(normalized);
+
+        const movedText = tasks.find(t => sameId(t.id, taskId))?.text ?? "task";
+        pushUndo(`Move "${movedText}"`, async () => {
+          applyTasks(previousNormalized);
+          await persistTaskOrder(previousNormalized);
+        });
 
         try {
           await persistTaskOrder(normalized);
