@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -87,6 +87,9 @@
       justify-content: space-between;
       margin-bottom: 14px;
       padding: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
     .left {
@@ -228,6 +231,42 @@
     .icon:hover {
       border-color: var(--lime);
       color: var(--lime);
+    }
+
+    .drag-handle {
+      align-items: center;
+      background: transparent;
+      border: none;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      justify-content: center;
+      padding: 4px 6px;
+    }
+
+    .drag-handle span {
+      background: var(--muted);
+      border-radius: 1px;
+      display: block;
+      height: 2px;
+      width: 14px;
+    }
+
+    .drag-handle:hover span {
+      background: var(--lime);
+    }
+
+    .task.dragging {
+      opacity: 0.35;
+    }
+
+    .task.drag-over-top {
+      border-top: 2px solid var(--lime);
+    }
+
+    .task.drag-over-bottom {
+      border-bottom: 2px solid var(--lime);
     }
 
     .badge {
@@ -538,349 +577,6 @@
       poolCache.set(payload);
       return payload;
     }
-
-    const IDIOM_POOL = [
-      { phrase: "A blessing in disguise", meaning: "Something that seems bad at first but turns out to be good" },
-      { phrase: "A dime a dozen", meaning: "Very common and of little value" },
-      { phrase: "A penny for your thoughts", meaning: "Asking someone what they are thinking about" },
-      { phrase: "Actions speak louder than words", meaning: "What you do matters more than what you say" },
-      { phrase: "Add fuel to the fire", meaning: "To worsen an already bad situation" },
-      { phrase: "All ears", meaning: "Fully listening and paying close attention" },
-      { phrase: "Barking up the wrong tree", meaning: "Looking in the wrong place or accusing the wrong person" },
-      { phrase: "Beat around the bush", meaning: "Avoiding the main topic or point" },
-      { phrase: "Bite off more than you can chew", meaning: "Taking on more responsibility than you can handle" },
-      { phrase: "Bite the bullet", meaning: "Enduring a painful or difficult situation with courage" },
-      { phrase: "Break a leg", meaning: "A way of wishing someone good luck" },
-      { phrase: "Break the ice", meaning: "To initiate conversation in a social setting" },
-      { phrase: "Burn bridges", meaning: "To permanently damage a relationship or opportunity" },
-      { phrase: "Burning the midnight oil", meaning: "Working very late into the night" },
-      { phrase: "Call it a day", meaning: "To stop working for the rest of the day" },
-      { phrase: "Caught red-handed", meaning: "Discovered in the act of doing something wrong" },
-      { phrase: "Cost an arm and a leg", meaning: "Something that is very expensive" },
-      { phrase: "Cut corners", meaning: "To do something the easy way, sacrificing quality" },
-      { phrase: "Don't bite the hand that feeds you", meaning: "Don't mistreat those who provide for or help you" },
-      { phrase: "Don't judge a book by its cover", meaning: "Don't judge something or someone by appearances alone" },
-      { phrase: "Every cloud has a silver lining", meaning: "Every bad situation has something positive to take from it" },
-      { phrase: "Face the music", meaning: "To accept the consequences of your actions" },
-      { phrase: "Get out of hand", meaning: "To lose control of a situation" },
-      { phrase: "Give the benefit of the doubt", meaning: "To trust someone in a situation where certainty is not possible" },
-      { phrase: "Go back to the drawing board", meaning: "Start something over again from the beginning" },
-      { phrase: "Hit the nail on the head", meaning: "To describe exactly what is causing a situation or problem" },
-      { phrase: "Hit the sack", meaning: "To go to bed or go to sleep" },
-      { phrase: "Jump on the bandwagon", meaning: "To follow a trend or popular activity" },
-      { phrase: "Keep your chin up", meaning: "Remain cheerful in a difficult situation" },
-      { phrase: "Kill two birds with one stone", meaning: "To accomplish two things with a single action" },
-      { phrase: "Let sleeping dogs lie", meaning: "To avoid bringing up a topic that could cause trouble" },
-      { phrase: "Miss the boat", meaning: "To miss an opportunity" },
-      { phrase: "No pain, no gain", meaning: "Hard work leads to success; you have to suffer to improve" },
-      { phrase: "On the ball", meaning: "Alert, effective, and efficient" },
-      { phrase: "Once in a blue moon", meaning: "Something that happens very rarely" },
-      { phrase: "Over the moon", meaning: "Extremely happy or delighted" },
-      { phrase: "Piece of cake", meaning: "Something that is very easy to do" },
-      { phrase: "Pull someone's leg", meaning: "To joke or tease someone" },
-      { phrase: "Put all your eggs in one basket", meaning: "To risk everything on a single venture" },
-      { phrase: "See eye to eye", meaning: "To agree with someone" },
-      { phrase: "Sit on the fence", meaning: "To avoid taking sides in a dispute" },
-      { phrase: "Spill the beans", meaning: "To reveal secret or confidential information" },
-      { phrase: "The ball is in your court", meaning: "It is your decision or your turn to take action" },
-      { phrase: "The best of both worlds", meaning: "Enjoying two different advantages at the same time" },
-      { phrase: "Throw in the towel", meaning: "To admit defeat or give up on something" },
-      { phrase: "Under the weather", meaning: "Feeling ill or unwell" },
-      { phrase: "Up in the air", meaning: "Uncertain or undecided" },
-      { phrase: "Wrap your head around something", meaning: "To understand something complex or difficult" },
-      { phrase: "You can't have your cake and eat it too", meaning: "You must choose; you cannot have everything at once" },
-      { phrase: "Zip your lips", meaning: "To stay silent or keep a secret" },
-      { phrase: "Bite the dust", meaning: "To fail, be defeated, or die" },
-      { phrase: "Blow off steam", meaning: "To release pent-up anger or frustration" },
-      { phrase: "Chew the fat", meaning: "To have a long, friendly conversation" },
-      { phrase: "Come rain or shine", meaning: "No matter what happens or what the circumstances are" },
-      { phrase: "Draw a blank", meaning: "To be unable to remember or think of something" },
-      { phrase: "Easier said than done", meaning: "Something is harder to achieve than it is to talk about" },
-      { phrase: "Fly off the handle", meaning: "To suddenly lose your temper" },
-      { phrase: "Get cold feet", meaning: "To suddenly become nervous about something you had planned to do" },
-      { phrase: "Get the ball rolling", meaning: "To start an activity or process" },
-      { phrase: "Give someone the cold shoulder", meaning: "To deliberately ignore someone" },
-      { phrase: "Go the extra mile", meaning: "To put in more effort than is expected or required" },
-      { phrase: "Hang in there", meaning: "To continue despite difficulty; to persevere" },
-      { phrase: "In hot water", meaning: "In trouble or in a difficult situation" },
-      { phrase: "It takes two to tango", meaning: "Both people involved in a situation are equally responsible" },
-      { phrase: "Jump to conclusions", meaning: "To make a decision without having all the facts" },
-      { phrase: "Keep a low profile", meaning: "To avoid attracting attention to yourself" },
-      { phrase: "Leave no stone unturned", meaning: "To try every possible approach to accomplish something" },
-      { phrase: "Look before you leap", meaning: "Think carefully before taking action" },
-      { phrase: "The cat's out of the bag", meaning: "A secret has been accidentally revealed" },
-      { phrase: "Steal someone's thunder", meaning: "To take attention or praise that should belong to someone else" },
-      { phrase: "Add insult to injury", meaning: "To make a bad situation even worse" },
-      { phrase: "Back to square one", meaning: "Starting over again from the beginning after a failure" },
-      { phrase: "Caught between a rock and a hard place", meaning: "Facing two equally difficult or unpleasant choices" },
-      { phrase: "Clean slate", meaning: "A fresh start with no past mistakes or failures held against you" },
-      { phrase: "Cross that bridge when you come to it", meaning: "Deal with a problem if and when it actually happens" },
-      { phrase: "Cut the mustard", meaning: "To meet the required standard or level of performance" },
-      { phrase: "Dead ringer", meaning: "A person or thing that looks exactly like another" },
-      { phrase: "Down to the wire", meaning: "Coming to a conclusion at the very last possible moment" },
-      { phrase: "Elephant in the room", meaning: "An obvious problem or difficult topic no one wants to address" },
-      { phrase: "Get a taste of your own medicine", meaning: "To experience the same unpleasant thing you do to others" },
-      { phrase: "Get your act together", meaning: "To organize yourself and start behaving more responsibly" },
-      { phrase: "Go against the grain", meaning: "To act contrary to what is expected or considered normal" },
-      { phrase: "Hit the ground running", meaning: "To start something quickly and energetically without delay" },
-      { phrase: "Hit the jackpot", meaning: "To achieve great success or win a large prize unexpectedly" },
-      { phrase: "Jumping the gun", meaning: "Starting something too soon or before the right time" },
-      { phrase: "Kick the bucket", meaning: "A humorous expression meaning to die" },
-      { phrase: "Knuckle down", meaning: "To apply oneself seriously to a task; to work hard" },
-      { phrase: "Let the chips fall where they may", meaning: "To accept whatever consequences come without trying to control them" },
-      { phrase: "Neck and neck", meaning: "Very close in a competition; nearly equal" },
-      { phrase: "Off the cuff", meaning: "Without prior preparation; improvised on the spot" },
-      { phrase: "On thin ice", meaning: "In a risky or precarious situation" },
-      { phrase: "Open a can of worms", meaning: "To create new problems by trying to solve an existing one" },
-      { phrase: "Play devil's advocate", meaning: "To argue a position you may not personally hold to test ideas" },
-      { phrase: "Read between the lines", meaning: "To understand a hidden or implied meaning in what is said" },
-      { phrase: "Rule of thumb", meaning: "A basic, practical principle based on experience rather than theory" },
-      { phrase: "Run like clockwork", meaning: "To operate perfectly and smoothly without any problems" },
-      { phrase: "Skeletons in the closet", meaning: "Hidden shameful secrets from someone's past" },
-      { phrase: "Speak of the devil", meaning: "Said when someone appears just after being mentioned" },
-      { phrase: "Take with a grain of salt", meaning: "To view something skeptically; to not take it too seriously" },
-      { phrase: "The last straw", meaning: "The final problem that makes a situation unbearable" },
-      { phrase: "Tie the knot", meaning: "To get married" },
-      { phrase: "Turn a blind eye", meaning: "To deliberately ignore something that is wrong or harmful" },
-      { phrase: "Two peas in a pod", meaning: "Two people who are very similar to each other" },
-      { phrase: "Under one's belt", meaning: "Something already achieved or experienced successfully" },
-      { phrase: "Watch your back", meaning: "Be careful of potential threats or enemies around you" },
-      { phrase: "When pigs fly", meaning: "Something that will never happen" },
-      { phrase: "With flying colors", meaning: "To succeed brilliantly and with great distinction" },
-      { phrase: "Wolf in sheep's clothing", meaning: "A dangerous person who disguises themselves as harmless or friendly" },
-      { phrase: "Bite off more than you can chew", meaning: "Taking on more responsibility than you can handle" },
-      { phrase: "Burst someone's bubble", meaning: "To destroy someone's happy illusion or unrealistic expectation" },
-      { phrase: "Catch someone off guard", meaning: "To surprise someone when they are not prepared" },
-      { phrase: "Cut to the chase", meaning: "To get to the important point without wasting time" },
-      { phrase: "Dot the i's and cross the t's", meaning: "To pay careful attention to every detail of something" },
-      { phrase: "Fish out of water", meaning: "A person who is in an unfamiliar and uncomfortable situation" },
-      { phrase: "Kick the habit", meaning: "To stop doing something that is bad for you" },
-      { phrase: "On the fence", meaning: "Undecided; unable to commit to one side or position" },
-      { phrase: "Raining cats and dogs", meaning: "Raining very heavily" },
-      { phrase: "Steal a march on someone", meaning: "To gain an advantage over someone without them realizing" },
-      { phrase: "The writing on the wall", meaning: "An ominous sign that something bad is about to happen" },
-      { phrase: "Throw caution to the wind", meaning: "To take a risk by ignoring the potential negative consequences" },
-      { phrase: "Walk on eggshells", meaning: "To be very careful about what you say or do in a sensitive situation" },
-    ];
-
-    const VOCAB_POOL = [
-      { word: "Aberrant", pos: "adj.", definition: "Departing from the normal or expected; unusual" },
-      { word: "Abstruse", pos: "adj.", definition: "Difficult to understand; obscure" },
-      { word: "Acrimony", pos: "n.", definition: "Bitterness or ill feeling in speech or manner" },
-      { word: "Ameliorate", pos: "v.", definition: "To make something bad or unsatisfactory better; improve" },
-      { word: "Anachronism", pos: "n.", definition: "Something placed outside its correct historical time" },
-      { word: "Anathema", pos: "n.", definition: "Something or someone that is strongly disliked or detested" },
-      { word: "Antipathy", pos: "n.", definition: "A deep-seated feeling of aversion or dislike" },
-      { word: "Arcane", pos: "adj.", definition: "Understood by few; mysterious or secret" },
-      { word: "Arduous", pos: "adj.", definition: "Involving or requiring great effort; difficult and tiring" },
-      { word: "Assiduous", pos: "adj.", definition: "Showing great care, attention, and effort; diligent" },
-      { word: "Audacious", pos: "adj.", definition: "Showing a willingness to take bold risks; daring" },
-      { word: "Avarice", pos: "n.", definition: "Extreme greed for wealth or material gain" },
-      { word: "Banal", pos: "adj.", definition: "Lacking originality; predictably ordinary" },
-      { word: "Belligerent", pos: "adj.", definition: "Hostile and aggressive; inclined to argue or fight" },
-      { word: "Capricious", pos: "adj.", definition: "Given to sudden and unpredictable changes of mood or behavior" },
-      { word: "Caustic", pos: "adj.", definition: "Sarcastic and scathing in a way that is hurtful" },
-      { word: "Circumspect", pos: "adj.", definition: "Wary and cautious; unwilling to take risks" },
-      { word: "Clandestine", pos: "adj.", definition: "Kept secret, especially for illicit or subversive reasons" },
-      { word: "Cogent", pos: "adj.", definition: "Clear, logical, and convincing; powerfully persuasive" },
-      { word: "Complacent", pos: "adj.", definition: "Showing uncritical satisfaction with oneself; self-satisfied" },
-      { word: "Contentious", pos: "adj.", definition: "Causing or likely to cause controversy; argumentative" },
-      { word: "Copious", pos: "adj.", definition: "Abundant in supply or quantity; plentiful" },
-      { word: "Culpable", pos: "adj.", definition: "Deserving blame for a fault or wrong; guilty" },
-      { word: "Deleterious", pos: "adj.", definition: "Causing harm or damage; injurious to health or well-being" },
-      { word: "Denigrate", pos: "v.", definition: "To criticize unfairly; to belittle or disparage" },
-      { word: "Diffident", pos: "adj.", definition: "Modest or shy due to a lack of self-confidence" },
-      { word: "Discerning", pos: "adj.", definition: "Having or showing good judgment; perceptive and astute" },
-      { word: "Disparate", pos: "adj.", definition: "Essentially different in kind; not able to be compared" },
-      { word: "Ebullient", pos: "adj.", definition: "Cheerful and full of energy; exuberant" },
-      { word: "Egregious", pos: "adj.", definition: "Outstandingly bad; shockingly obvious" },
-      { word: "Ephemeral", pos: "adj.", definition: "Lasting for a very short time; fleeting" },
-      { word: "Equivocal", pos: "adj.", definition: "Open to more than one interpretation; ambiguous" },
-      { word: "Esoteric", pos: "adj.", definition: "Understood by only a few with specialized knowledge" },
-      { word: "Exacerbate", pos: "v.", definition: "To make a problem, situation, or feeling worse" },
-      { word: "Fastidious", pos: "adj.", definition: "Very attentive to accuracy and detail; meticulous" },
-      { word: "Furtive", pos: "adj.", definition: "Attempting to avoid notice; secretive and sly" },
-      { word: "Garrulous", pos: "adj.", definition: "Excessively talkative, especially on trivial matters" },
-      { word: "Gratuitous", pos: "adj.", definition: "Uncalled for; lacking good reason; unwarranted" },
-      { word: "Gregarious", pos: "adj.", definition: "Fond of company; sociable" },
-      { word: "Hubris", pos: "n.", definition: "Excessive pride or self-confidence, often leading to downfall" },
-      { word: "Iconoclast", pos: "n.", definition: "A person who attacks or rejects established beliefs or institutions" },
-      { word: "Impetuous", pos: "adj.", definition: "Acting or done quickly and without careful thought; impulsive" },
-      { word: "Indolent", pos: "adj.", definition: "Wanting to avoid activity or exertion; lazy" },
-      { word: "Ineffable", pos: "adj.", definition: "Too great or extreme to be expressed in words" },
-      { word: "Insipid", pos: "adj.", definition: "Lacking vigor, interest, or strong flavor; dull and bland" },
-      { word: "Intrepid", pos: "adj.", definition: "Fearless and adventurous; bold and brave" },
-      { word: "Inveterate", pos: "adj.", definition: "Having a habit too firmly established to change" },
-      { word: "Judicious", pos: "adj.", definition: "Having, showing, or done with good judgment; wise" },
-      { word: "Laconic", pos: "adj.", definition: "Using very few words; brief and concise in speech" },
-      { word: "Loquacious", pos: "adj.", definition: "Tending to talk a great deal; talkative" },
-      { word: "Magnanimous", pos: "adj.", definition: "Generous or forgiving, especially toward a rival or enemy" },
-      { word: "Malevolent", pos: "adj.", definition: "Having or showing a wish to do evil to others" },
-      { word: "Mendacious", pos: "adj.", definition: "Not telling the truth; lying; dishonest" },
-      { word: "Mercurial", pos: "adj.", definition: "Subject to sudden or unpredictable changes of mood" },
-      { word: "Meticulous", pos: "adj.", definition: "Showing great attention to detail; very careful and precise" },
-      { word: "Mitigate", pos: "v.", definition: "To make less severe, serious, or painful; to lessen" },
-      { word: "Nefarious", pos: "adj.", definition: "Wicked or criminal; flagrantly immoral" },
-      { word: "Obfuscate", pos: "v.", definition: "To make unclear, confusing, or difficult to understand" },
-      { word: "Obsequious", pos: "adj.", definition: "Excessively eager to serve or please; fawning" },
-      { word: "Obstinate", pos: "adj.", definition: "Stubbornly refusing to change one's opinion or course of action" },
-      { word: "Onerous", pos: "adj.", definition: "Involving a great deal of effort, trouble, or difficulty" },
-      { word: "Ostentatious", pos: "adj.", definition: "Characterized by a vulgar or pretentious display; showy" },
-      { word: "Parsimonious", pos: "adj.", definition: "Unwilling to spend money or use resources; miserly" },
-      { word: "Pedantic", pos: "adj.", definition: "Excessively concerned with minor details or rules" },
-      { word: "Perfidious", pos: "adj.", definition: "Deceitful and untrustworthy; guilty of betrayal" },
-      { word: "Pernicious", pos: "adj.", definition: "Having a harmful effect, especially in a gradual or subtle way" },
-      { word: "Placate", pos: "v.", definition: "To make someone less angry or hostile; to appease" },
-      { word: "Pragmatic", pos: "adj.", definition: "Dealing with things sensibly and realistically; practical" },
-      { word: "Precarious", pos: "adj.", definition: "Not securely held; uncertain or risky" },
-      { word: "Prodigious", pos: "adj.", definition: "Remarkably great in extent, size, or degree; impressive" },
-      { word: "Prolific", pos: "adj.", definition: "Producing many works, results, or offspring; highly productive" },
-      { word: "Querulous", pos: "adj.", definition: "Complaining in a petulant or whining manner" },
-      { word: "Recalcitrant", pos: "adj.", definition: "Having an obstinately uncooperative attitude; stubbornly defiant" },
-      { word: "Reticent", pos: "adj.", definition: "Not revealing one's thoughts or feelings readily; reserved" },
-      { word: "Sagacious", pos: "adj.", definition: "Having or showing keen mental discernment and wisdom" },
-      { word: "Sanguine", pos: "adj.", definition: "Optimistic, especially in a difficult situation" },
-      { word: "Sedulous", pos: "adj.", definition: "Showing dedication and diligence; hardworking and persevering" },
-      { word: "Sycophant", pos: "n.", definition: "A person who acts obsequiously toward those in power; a flatterer" },
-      { word: "Temerity", pos: "n.", definition: "Excessive confidence or boldness; reckless audacity" },
-      { word: "Tenacious", pos: "adj.", definition: "Holding firmly to an opinion or course; persistent" },
-      { word: "Truculent", pos: "adj.", definition: "Eager or quick to argue or fight; aggressively defiant" },
-      { word: "Umbrage", pos: "n.", definition: "Offense or annoyance taken at a perceived slight" },
-      { word: "Vacuous", pos: "adj.", definition: "Having or showing a lack of thought or intelligence; empty" },
-      { word: "Verbose", pos: "adj.", definition: "Using or containing more words than necessary; wordy" },
-      { word: "Vindictive", pos: "adj.", definition: "Having or showing a strong desire for revenge" },
-      { word: "Zealous", pos: "adj.", definition: "Having or showing great energy or enthusiasm in pursuit of a cause" },
-      { word: "Alacrity", pos: "n.", definition: "Brisk and cheerful readiness; eager willingness to do something" },
-      { word: "Amalgamate", pos: "v.", definition: "To combine or unite into a single unified body or organization" },
-      { word: "Amorphous", pos: "adj.", definition: "Without a clearly defined shape, form, or structure; vague" },
-      { word: "Apocryphal", pos: "adj.", definition: "Of doubtful authenticity; widely circulated but probably not true" },
-      { word: "Approbation", pos: "n.", definition: "Approval or praise, especially from an authority or official body" },
-      { word: "Attenuate", pos: "v.", definition: "To reduce in force, effect, or value; to make thin or weaker" },
-      { word: "Auspicious", pos: "adj.", definition: "Conducive to success; favorable; giving promise of a good outcome" },
-      { word: "Bellicose", pos: "adj.", definition: "Demonstrating aggression and willingness to fight; warlike" },
-      { word: "Bombast", pos: "n.", definition: "High-sounding language with little meaning; pompous rhetoric" },
-      { word: "Bucolic", pos: "adj.", definition: "Relating to the pleasant aspects of the countryside; pastoral and rural" },
-      { word: "Burgeon", pos: "v.", definition: "To begin to grow or increase rapidly; to flourish and expand" },
-      { word: "Cacophony", pos: "n.", definition: "A harsh, discordant mixture of sounds; a jarring noise" },
-      { word: "Capitulate", pos: "v.", definition: "To cease to resist an opponent or force; to surrender under conditions" },
-      { word: "Chicanery", pos: "n.", definition: "The use of trickery to achieve a purpose; deception by clever argument" },
-      { word: "Coalesce", pos: "v.", definition: "To come together and form one mass, whole, or group; to merge" },
-      { word: "Compunction", pos: "n.", definition: "A feeling of guilt or moral scruple that prevents or follows an action" },
-      { word: "Conflagration", pos: "n.", definition: "An extensive, destructive fire; a large-scale conflict or war" },
-      { word: "Cupidity", pos: "n.", definition: "Greed for money or possessions; extreme acquisitiveness" },
-      { word: "Dauntless", pos: "adj.", definition: "Showing fearlessness and determination; not easily discouraged" },
-      { word: "Deference", pos: "n.", definition: "Humble submission and respectful yielding to the judgment of another" },
-      { word: "Didactic", pos: "adj.", definition: "Intended to teach; inclined to lecture others; morally instructive" },
-      { word: "Dilettante", pos: "n.", definition: "A person who dabbles in an area without real commitment or expertise" },
-      { word: "Dissemble", pos: "v.", definition: "To conceal one's true motives or feelings by pretending to have others" },
-      { word: "Effrontery", pos: "n.", definition: "Insolent or impudent behavior; audacious boldness showing no shame" },
-      { word: "Enervate", pos: "v.", definition: "To cause to feel drained of energy or vitality; to weaken and exhaust" },
-      { word: "Equanimity", pos: "n.", definition: "Mental calmness and composure, especially in difficult situations" },
-      { word: "Evanescent", pos: "adj.", definition: "Soon passing out of sight, memory, or existence; quickly fading" },
-      { word: "Excoriate", pos: "v.", definition: "To censure or criticize severely and harshly; to berate" },
-      { word: "Exigent", pos: "adj.", definition: "Pressing and demanding; requiring immediate action or attention" },
-      { word: "Foment", pos: "v.", definition: "To instigate or stir up trouble, rebellion, or unrest" },
-      { word: "Fortuitous", pos: "adj.", definition: "Happening by chance rather than design; lucky or fortunate" },
-      { word: "Grandiloquent", pos: "adj.", definition: "Pompous or extravagant in language; using impressive-sounding words" },
-      { word: "Guile", pos: "n.", definition: "Sly or cunning intelligence; deceit used to achieve one's ends" },
-      { word: "Hegemony", pos: "n.", definition: "Leadership or dominance, especially of one country or group over others" },
-      { word: "Implacable", pos: "adj.", definition: "Unable to be appeased or placated; impossible to calm or relent" },
-      { word: "Impugn", pos: "v.", definition: "To dispute the truth, validity, or honesty of; to call into question" },
-      { word: "Inchoate", pos: "adj.", definition: "Just begun and not fully formed or developed; rudimentary" },
-      { word: "Inimical", pos: "adj.", definition: "Tending to obstruct or harm; hostile; adverse to one's interests" },
-      { word: "Invective", pos: "n.", definition: "Insulting, abusive, or highly critical language; a verbal attack" },
-      { word: "Lachrymose", pos: "adj.", definition: "Tearful or given to weeping; inducing or full of tears; mournful" },
-      { word: "Lassitude", pos: "n.", definition: "Physical or mental weariness; a state of fatigue and listlessness" },
-      { word: "Lugubrious", pos: "adj.", definition: "Looking or sounding sad and dismal; excessively mournful" },
-      { word: "Malfeasance", pos: "n.", definition: "Wrongdoing, especially by a public official; illegal conduct in office" },
-      { word: "Meretricious", pos: "adj.", definition: "Apparently attractive but having no real value or integrity; falsely alluring" },
-      { word: "Munificent", pos: "adj.", definition: "More generous than is usual or necessary; lavishly bountiful" },
-      { word: "Nebulous", pos: "adj.", definition: "Not clearly defined or stated; vague, hazy, or indistinct" },
-      { word: "Opprobrium", pos: "n.", definition: "Harsh criticism or censure; public disgrace arising from shameful conduct" },
-      { word: "Paucity", pos: "n.", definition: "The presence of something in only small or insufficient amounts; scarcity" },
-      { word: "Perspicacious", pos: "adj.", definition: "Having a ready insight into things; astute, shrewd, and perceptive" },
-      { word: "Phlegmatic", pos: "adj.", definition: "Having an unemotional and stolidly calm disposition; not easily excited" },
-      { word: "Portent", pos: "n.", definition: "A sign or warning of a momentous or calamitous event; an omen" },
-      { word: "Protean", pos: "adj.", definition: "Tending to change form frequently; versatile and adaptable" },
-      { word: "Quixotic", pos: "adj.", definition: "Exceedingly idealistic; unrealistic and impractical in a romantic way" },
-      { word: "Rancor", pos: "n.", definition: "Bitter, long-lasting resentment or ill feeling; deep-seated malice" },
-      { word: "Recondite", pos: "adj.", definition: "Not known by many people; dealing with obscure or little-known subjects" },
-      { word: "Repudiate", pos: "v.", definition: "To refuse to accept or be associated with; to reject as untrue or unjust" },
-      { word: "Sanctimonious", pos: "adj.", definition: "Making a show of being morally superior to others; self-righteous" },
-      { word: "Sardonic", pos: "adj.", definition: "Grimly mocking or cynical; characterized by bitter or scornful mockery" },
-      { word: "Serendipity", pos: "n.", definition: "The occurrence of fortunate events by chance; a pleasant surprise" },
-      { word: "Sophistry", pos: "n.", definition: "The use of clever but misleading arguments; plausible but fallacious reasoning" },
-      { word: "Stentorian", pos: "adj.", definition: "Loud and powerful (of a voice); booming in sound" },
-      { word: "Surreptitious", pos: "adj.", definition: "Kept secret because it would not be approved of; done by stealth" },
-      { word: "Tacit", pos: "adj.", definition: "Understood or implied without being directly stated; unspoken" },
-      { word: "Tenuous", pos: "adj.", definition: "Very weak or slight; having little substance or validity" },
-      { word: "Timorous", pos: "adj.", definition: "Showing or suffering from nervousness and a lack of confidence; timid" },
-      { word: "Tortuous", pos: "adj.", definition: "Full of twists and turns; long, complex, and difficult to follow" },
-      { word: "Trepidation", pos: "n.", definition: "A feeling of fear or anxious uncertainty about something to come" },
-      { word: "Turpitude", pos: "n.", definition: "Wickedness or depravity; grossly immoral behavior" },
-      { word: "Unctuous", pos: "adj.", definition: "Excessively flattering and ingratiating; oily or greasy in manner" },
-      { word: "Usurp", pos: "v.", definition: "To take a position of power or importance illegally or by force" },
-      { word: "Vacillate", pos: "v.", definition: "To waver between different opinions or actions; to be chronically indecisive" },
-      { word: "Venal", pos: "adj.", definition: "Susceptible to bribery; corrupt; motivated entirely by personal gain" },
-      { word: "Veracity", pos: "n.", definition: "Conformity to facts; habitual truthfulness and accuracy" },
-      { word: "Vitriolic", pos: "adj.", definition: "Filled with bitter criticism or malice; caustic and scathing" },
-      { word: "Vociferous", pos: "adj.", definition: "Expressing opinions loudly and forcefully; vehemently clamorous" },
-      { word: "Wanton", pos: "adj.", definition: "Deliberate and unprovoked; showing no concern for the rights of others" },
-      { word: "Abnegate", pos: "v.", definition: "To renounce or give up something, such as a right, belief, or duty" },
-      { word: "Adumbrate", pos: "v.", definition: "To outline or sketch out broadly; to give a faint indication of" },
-      { word: "Anodyne", pos: "adj.", definition: "Not likely to cause controversy; mildly pleasing; pain-relieving" },
-      { word: "Apposite", pos: "adj.", definition: "Apt and fitting in the circumstances; highly pertinent" },
-      { word: "Arrogate", pos: "v.", definition: "To take or claim for oneself without justification; to seize presumptuously" },
-      { word: "Aspersion", pos: "n.", definition: "An attack on the reputation or integrity of someone; a damaging remark" },
-      { word: "Calumniate", pos: "v.", definition: "To make false and defamatory statements about; to slander" },
-      { word: "Castigate", pos: "v.", definition: "To reprimand or criticize someone severely; to chastise" },
-      { word: "Cogitate", pos: "v.", definition: "To think deeply about something; to ponder or meditate carefully" },
-      { word: "Demagogue", pos: "n.", definition: "A political leader who seeks support by appealing to emotions over reason" },
-      { word: "Diaphanous", pos: "adj.", definition: "Light, delicate, and translucent; so thin as to be almost transparent" },
-      { word: "Gainsay", pos: "v.", definition: "To deny or contradict; to speak against or oppose" },
-      { word: "Germane", pos: "adj.", definition: "Relevant and appropriate to a subject under consideration; pertinent" },
-      { word: "Hapless", pos: "adj.", definition: "Unfortunate; having consistently bad luck; unlucky" },
-      { word: "Impecunious", pos: "adj.", definition: "Having little or no money; chronically penniless" },
-      { word: "Imperious", pos: "adj.", definition: "Assuming power or authority without justification; arrogantly domineering" },
-      { word: "Inscrutable", pos: "adj.", definition: "Impossible to understand or interpret; not easily investigated" },
-      { word: "Inure", pos: "v.", definition: "To accustom someone to something, especially something unpleasant" },
-      { word: "Jocular", pos: "adj.", definition: "Fond of or characterized by joking; lighthearted and humorous" },
-      { word: "Laud", pos: "v.", definition: "To praise highly; to extol" },
-      { word: "Mellifluous", pos: "adj.", definition: "Sweet or musical; pleasant to hear; flowing smoothly" },
-      { word: "Militate", pos: "v.", definition: "To be a powerful or conclusive factor in preventing something" },
-      { word: "Morose", pos: "adj.", definition: "Sullen, gloomy, and ill-tempered; having a brooding disposition" },
-      { word: "Noxious", pos: "adj.", definition: "Harmful or very unpleasant; injurious to health or morals" },
-      { word: "Obdurate", pos: "adj.", definition: "Stubbornly refusing to change one's opinion; hardened and unyielding" },
-      { word: "Oblique", pos: "adj.", definition: "Not expressed or done in a direct way; neither parallel nor perpendicular" },
-      { word: "Officious", pos: "adj.", definition: "Asserting authority in an annoyingly domineering way; intrusively eager" },
-      { word: "Ostracize", pos: "v.", definition: "To exclude from a society or group by common consent" },
-      { word: "Palliative", pos: "adj.", definition: "Relieving pain without dealing with the underlying cause; soothing" },
-      { word: "Palpable", pos: "adj.", definition: "Able to be touched or felt; so obvious as to be clearly evident" },
-      { word: "Pellucid", pos: "adj.", definition: "Translucently clear; easily understood; lucid and unclouded" },
-      { word: "Penury", pos: "n.", definition: "Extreme poverty; destitution and extreme scarcity of resources" },
-      { word: "Perfunctory", pos: "adj.", definition: "Carried out with a minimum of effort; routine and superficial" },
-      { word: "Platitude", pos: "n.", definition: "A remark used too often to be interesting; a trite or banal statement" },
-      { word: "Prodigal", pos: "adj.", definition: "Spending money or resources freely and recklessly; extravagantly wasteful" },
-      { word: "Propitious", pos: "adj.", definition: "Giving or indicating a good chance of success; favorably disposed" },
-      { word: "Prosaic", pos: "adj.", definition: "Having the style of ordinary prose; commonplace, unimaginative, and dull" },
-      { word: "Pugnacious", pos: "adj.", definition: "Eager or quick to argue, quarrel, or fight; combative" },
-      { word: "Pusillanimous", pos: "adj.", definition: "Showing a lack of courage or determination; contemptibly timid" },
-      { word: "Rescind", pos: "v.", definition: "To revoke, cancel, or repeal an official decision, law, or agreement" },
-      { word: "Restive", pos: "adj.", definition: "Unable to remain still; impatient under restriction or delay" },
-      { word: "Somnolent", pos: "adj.", definition: "Sleepy and drowsy; tending to induce sleep" },
-      { word: "Stymie", pos: "v.", definition: "To prevent or hinder the progress of; to obstruct or thwart" },
-      { word: "Subjugate", pos: "v.", definition: "To bring under domination or control; to conquer and make subservient" },
-      { word: "Supercilious", pos: "adj.", definition: "Behaving as if one is superior to others; disdainfully condescending" },
-      { word: "Superfluous", pos: "adj.", definition: "Unnecessary, especially through being more than enough; redundant" },
-      { word: "Tangential", pos: "adj.", definition: "Diverging from what is relevant; only loosely related to the subject" },
-      { word: "Transgress", pos: "v.", definition: "To go beyond the limits set by a rule or law; to sin or violate" },
-      { word: "Transient", pos: "adj.", definition: "Lasting only for a short time; passing quickly; impermanent" },
-      { word: "Unconscionable", pos: "adj.", definition: "Not right or reasonable; shockingly excessive or immoral" },
-      { word: "Unequivocal", pos: "adj.", definition: "Leaving no doubt; expressed in clear terms with no room for ambiguity" },
-      { word: "Vitiate", pos: "v.", definition: "To impair the quality or efficiency of; to make faulty or invalid" },
-      { word: "Wily", pos: "adj.", definition: "Skilled at gaining an advantage, especially deceitfully; cunning" },
-    ];
-
 
     function App() {
       return <MainApp />;
@@ -1311,6 +1007,7 @@
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
       const [undoStack, setUndoStack] = useState([]);
+      const [learningCollapsed, setLearningCollapsed] = useState(false);
 
       function pushUndo(label, undoFn) {
         setUndoStack(prev => [...prev.slice(-4), { label, undo: undoFn }]);
@@ -1325,6 +1022,19 @@
         } catch (e) {
           setError("Undo failed: " + e.message);
         }
+      }
+
+      function scrollToId(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const bar = document.querySelector('.bar');
+        const offset = bar ? bar.getBoundingClientRect().height + 8 : 16;
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' });
+      }
+
+      function scrollToLearning(subId) {
+        setLearningCollapsed(false);
+        setTimeout(() => scrollToId(subId), 50);
       }
 
       const todayPretty = new Date().toLocaleDateString("en-US", {
@@ -1438,9 +1148,18 @@
                 onClick={applyUndo}
                 disabled={undoStack.length === 0}
                 title={undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].label}` : "Nothing to undo"}
-              >Undo{undoStack.length > 0 ? ` (${undoStack.length})` : ""}</button>
+              >Undo</button>
             </div>
             <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
+            <div style={{ width: '100%', borderTop: '1px solid var(--line)', paddingTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {sections.map(section => (
+                <button key={section.id} className="btn gray" onClick={() => scrollToId(`section-${section.id}`)}>
+                  {section.name}
+                </button>
+              ))}
+              <button className="btn cyan" onClick={() => scrollToLearning('learning-idioms')}>Idioms</button>
+              <button className="btn cyan" onClick={() => scrollToLearning('learning-vocab')}>Vocab</button>
+            </div>
           </div>
 
           {showNewSection && (
@@ -1523,7 +1242,7 @@
           )}
 
           {sections.map((section) => (
-            <div className="panel" key={section.id}>
+            <div className="panel" key={section.id} id={`section-${section.id}`}>
               <SectionComponent
                 user={user}
                 section={section}
@@ -1537,15 +1256,14 @@
             </div>
           ))}
 
-          <LearningPanel user={user} />
+          <LearningPanel user={user} collapsed={learningCollapsed} setCollapsed={setLearningCollapsed} />
         </>
       );
     }
 
-    function LearningPanel({ user }) {
+    function LearningPanel({ user, collapsed, setCollapsed }) {
       const [data, setData] = useState(null);
       const [status, setStatus] = useState("loading");
-      const [collapsed, setCollapsed] = useState(false);
       const [generating, setGenerating] = useState(false);
       const [errMsg, setErrMsg] = useState(null);
 
@@ -1614,7 +1332,7 @@
       }
 
       return (
-        <div className="panel cyan">
+        <div className="panel cyan" id="learning-panel">
           <div className="section-head">
             <div className="section-title" style={{ color: "var(--cyan)" }}>Learning</div>
             <div className="meta">
@@ -1642,7 +1360,7 @@
               )}
               {status === "ready" && data && (
                 <div className="learning-grid">
-                  <div>
+                  <div id="learning-idioms">
                     <div style={{ color: "var(--gold)", fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", marginBottom: "8px", textTransform: "uppercase" }}>
                       Idioms of the Day
                     </div>
@@ -1660,7 +1378,7 @@
                     </div>
                   </div>
 
-                  <div>
+                  <div id="learning-vocab">
                     <div style={{ color: "var(--gold)", fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", marginBottom: "8px", textTransform: "uppercase" }}>
                       Vocabulary of the Day
                     </div>
@@ -1692,6 +1410,9 @@
       const [taskType, setTaskType] = useState("daily");
       const [isSubtaskMode, setIsSubtaskMode] = useState(false);
       const [forcedParentTaskId, setForcedParentTaskId] = useState(null);
+      const [draggedId, setDraggedId] = useState(null);
+      const [dragOverId, setDragOverId] = useState(null);
+      const [dropAbove, setDropAbove] = useState(true);
       const newTaskInputRef = useRef(null);
       const sectionsRef = useRef(sections);
       const today = getCurrentDate();
@@ -2117,6 +1838,41 @@
         }
       }
 
+      async function moveTaskToPosition(fromTaskId, toTaskId, above) {
+        if (sameId(fromTaskId, toTaskId)) return;
+        const previousNormalized = reindexTasks([...tasks]);
+        const branchIds = findTaskBranchIds(fromTaskId);
+        if (branchIds.has(String(toTaskId))) return;
+
+        const branchTasks = tasks.filter(t => branchIds.has(String(t.id)));
+        const otherTasks = tasks.filter(t => !branchIds.has(String(t.id)));
+
+        const targetIdx = otherTasks.findIndex(t => sameId(t.id, toTaskId));
+        if (targetIdx < 0) return;
+
+        const insertAt = above ? targetIdx : targetIdx + 1;
+        const next = [
+          ...otherTasks.slice(0, insertAt),
+          ...branchTasks,
+          ...otherTasks.slice(insertAt)
+        ];
+
+        const normalized = reindexTasks(next);
+        applyTasks(normalized);
+
+        const movedText = tasks.find(t => sameId(t.id, fromTaskId))?.text ?? "task";
+        pushUndo(`Move "${movedText}"`, async () => {
+          applyTasks(previousNormalized);
+          await persistTaskOrder(previousNormalized);
+        });
+
+        try {
+          await persistTaskOrder(normalized);
+        } catch (e) {
+          setError("Order sync failed: " + e.message);
+        }
+      }
+
       async function updateTaskText(taskId, newText) {
         const text = newText.trim();
         if (!text) return;
@@ -2196,11 +1952,23 @@
                   task={task}
                   toggleTask={toggleTask}
                   deleteTask={deleteTask}
-                  moveTask={moveTask}
                   updateTaskText={updateTaskText}
                   updateTaskParent={updateTaskParent}
                   updateTaskType={updateTaskType}
                   startSubtaskFor={startSubtaskFor}
+                  draggedId={draggedId}
+                  dragOverId={dragOverId}
+                  dropAbove={dropAbove}
+                  onDragStart={(id) => setDraggedId(id)}
+                  onDragOver={(id, above) => { setDragOverId(id); setDropAbove(above); }}
+                  onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+                  onDrop={(targetId, above) => {
+                    if (draggedId && !sameId(draggedId, targetId)) {
+                      moveTaskToPosition(draggedId, targetId, above);
+                    }
+                    setDraggedId(null);
+                    setDragOverId(null);
+                  }}
                 />
                 {forcedParentTaskId && sameId(forcedParentTaskId, task.id) && renderTaskComposer(true)}
               </React.Fragment>
@@ -2212,7 +1980,7 @@
       );
     }
 
-    function TaskItem({ task, toggleTask, deleteTask, moveTask, updateTaskText, updateTaskParent, updateTaskType, startSubtaskFor }) {
+    function TaskItem({ task, toggleTask, deleteTask, updateTaskText, updateTaskParent, updateTaskType, startSubtaskFor, draggedId, dragOverId, dropAbove, onDragStart, onDragOver, onDragEnd, onDrop }) {
       const [editing, setEditing] = useState(false);
       const [text, setText] = useState(task.text);
 
@@ -2224,8 +1992,18 @@
         setEditing(false);
       }
 
+      const isDragging = String(draggedId) === String(task.id);
+      const isDragOver = String(dragOverId) === String(task.id) && !isDragging;
+
       return (
-        <li className={`task ${task.completed ? "done" : ""} ${task.parent_task_id ? "sub" : ""}`}>
+        <li
+          className={`task ${task.completed ? "done" : ""} ${task.parent_task_id ? "sub" : ""} ${isDragging ? "dragging" : ""} ${isDragOver && dropAbove ? "drag-over-top" : ""} ${isDragOver && !dropAbove ? "drag-over-bottom" : ""}`}
+          draggable={true}
+          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(task.id); }}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; const rect = e.currentTarget.getBoundingClientRect(); onDragOver(task.id, e.clientY < rect.top + rect.height / 2); }}
+          onDragEnd={onDragEnd}
+          onDrop={(e) => { e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); onDrop(task.id, e.clientY < rect.top + rect.height / 2); }}
+        >
           <input
             className="check"
             type="checkbox"
@@ -2257,9 +2035,10 @@
           </div>
 
           <div className="meta">
+            <div className="drag-handle" title="Drag to reorder">
+              <span></span><span></span><span></span>
+            </div>
             <button className="icon" title="Add subtask below this task" onClick={() => startSubtaskFor(task.id)}>+</button>
-            <button className="icon" title="Move up" onClick={() => moveTask(task.id, -1)}>{"\u2191"}</button>
-            <button className="icon" title="Move down" onClick={() => moveTask(task.id, 1)}>{"\u2193"}</button>
             {task.parent_task_id && (
               <button className="icon" title="Remove parent" onClick={() => updateTaskParent(task.id, null)}>-</button>
             )}
