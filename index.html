@@ -530,6 +530,19 @@
       padding: 8px 10px;
     }
 
+    .memory-word-chip {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--lime);
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      padding: 6px 10px;
+      text-transform: uppercase;
+    }
+
     .memory-stat-grid {
       display: grid;
       gap: 16px;
@@ -762,6 +775,30 @@
       { name: "Augustus Yamamoto", face: "Lean angular face, deep-set dark eyes, silvering temples", detail: "Maritime historian who sculpts in clay" },
     ];
 
+    const WORD_POOL = [
+      "apple", "bridge", "candle", "desert", "eagle", "fence", "guitar",
+      "hammer", "island", "jacket", "kettle", "ladder", "marble", "needle",
+      "ocean", "piano", "quilt", "river", "shovel", "tower", "umbrella",
+      "valley", "wallet", "anchor", "basket", "cloud", "dragon", "engine",
+      "forest", "globe", "helmet", "jungle", "lemon", "mirror", "napkin",
+      "olive", "pencil", "rocket", "saddle", "tunnel", "volcano", "window",
+      "arrow", "barrel", "castle", "diamond", "feather", "glacier", "harbor",
+      "lantern", "meadow", "oyster", "palace", "ribbon", "sailor", "trophy",
+      "viper", "walrus", "zipper", "almond", "bison", "cactus", "dolphin",
+      "fabric", "garlic", "harvest", "insect", "jaguar", "kernel", "lobster",
+      "mustard", "nomad", "pebble", "quarry", "sphinx", "tandem", "velvet",
+      "wrench", "canopy", "debris", "emblem", "falcon", "goblet", "hatchet",
+      "ibis", "jewel", "kestrel", "lagoon", "mango", "nozzle", "pillar",
+    ];
+
+    const WORD_TIPS = [
+      "Story link: weave all the words into a single vivid, absurd story — the stranger the scene, the more memorable it becomes.",
+      "Method of loci: mentally place each word at a specific spot in a room you know well, then walk through it to recall them.",
+      "Category grouping: mentally sort words into clusters (animals, tools, nature). Recalling one category brings back all its members.",
+      "Emotional hook: attach a strong feeling or personal memory to each word. Emotion dramatically strengthens recall.",
+      "Visual chaining: picture the words as physical objects colliding or interacting — movement and interaction encode better than static images.",
+    ];
+
     const NUMBER_TIPS = [
       "Chunking: group digits into pairs or triplets (e.g. 47·291·836). Your brain handles chunks far better than lone digits.",
       "Story method: assign a vivid image to each chunk. 47 = a person running, 29 = jumping a fence — link them into one scene.",
@@ -778,7 +815,9 @@
       "Celebrity swap: think of a famous person with the same first name and imagine them with this person's face and detail.",
     ];
 
-    function MemoryTrainingPage({ onBack }) {
+    function MemoryTrainingPage({ onBack, user }) {
+      const CACHE_KEY = `memory_perf_${user?.id || 'guest'}`;
+
       const [phase, setPhase] = useState('setup');
       const [durationMins, setDurationMins] = useState(5);
       const [timeLeft, setTimeLeft] = useState(0);
@@ -788,13 +827,27 @@
       const [recentScores, setRecentScores] = useState([]);
       const [exercise, setExercise] = useState(null);
       const [numberInput, setNumberInput] = useState('');
+      const [wordInput, setWordInput] = useState('');
       const [choiceAnswers, setChoiceAnswers] = useState({});
       const [feedbackData, setFeedbackData] = useState(null);
       const [stats, setStats] = useState({ correct: 0, total: 0, count: 0 });
+      const [lastPerf, setLastPerf] = useState(null);
       const nextLevelRef = useRef(1);
       const phaseRef = useRef('setup');
 
       useEffect(() => { phaseRef.current = phase; }, [phase]);
+
+      useEffect(() => {
+        try {
+          const saved = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+          if (saved) {
+            setLastPerf(saved);
+            const startLevel = Math.max(1, Math.min(8, saved.level || 1));
+            setLevel(startLevel);
+            nextLevelRef.current = startLevel;
+          }
+        } catch(e) {}
+      }, []);
 
       useEffect(() => {
         if (phase === 'setup' || phase === 'done') return;
@@ -814,11 +867,16 @@
       }, [studyTimeLeft]);
 
       function buildExercise(lvl) {
-        const useNumbers = Math.random() < 0.5;
-        if (useNumbers) {
+        const roll = Math.random();
+        if (roll < 0.34) {
           const len = Math.min(3 + lvl, 10);
           const digits = Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join('');
-          return { type: 'numbers', digits, studyTime: Math.max(5, Math.ceil(len * 1.8)) };
+          return { type: 'numbers', digits, studyTime: Math.max(4, Math.ceil(len * 1.2)) };
+        }
+        if (roll < 0.67) {
+          const count = Math.min(3 + lvl, 10);
+          const words = [...WORD_POOL].sort(() => Math.random() - 0.5).slice(0, count);
+          return { type: 'words', words, studyTime: Math.max(6, Math.ceil(count * 2.5)) };
         }
         const count = lvl <= 2 ? 2 : lvl <= 4 ? 3 : 4;
         const pool = [...NAME_POOL].sort(() => Math.random() - 0.5);
@@ -834,23 +892,24 @@
           const choices = [...wrongs, person.detail].sort(() => Math.random() - 0.5);
           return { id: `q${i}`, kind: 'name-to-detail', prompt: person.name, answer: person.detail, choices };
         });
-        return { type: 'names', persons: shown, studyTime: Math.max(8, count * 6), questions };
+        return { type: 'names', persons: shown, studyTime: Math.max(10, count * 8), questions: questions.sort(() => Math.random() - 0.5) };
       }
 
       function startSession() {
         const total = durationMins * 60;
         setTimeLeft(total);
-        setLevel(1);
-        nextLevelRef.current = 1;
+        const startLevel = nextLevelRef.current;
+        setLevel(startLevel);
         setRecentScores([]);
         setStats({ correct: 0, total: 0, count: 0 });
-        launchExercise(1);
+        launchExercise(startLevel);
       }
 
       function launchExercise(lvl) {
         const ex = buildExercise(lvl);
         setExercise(ex);
         setNumberInput('');
+        setWordInput('');
         setChoiceAnswers({});
         setFeedbackData(null);
         setStudyTimeLeft(ex.studyTime);
@@ -858,8 +917,24 @@
         setPhase('study');
       }
 
+      function savePerf(finalLevel, sessionStats) {
+        try {
+          const existing = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+          const updated = {
+            level: finalLevel,
+            totalCorrect: (existing.totalCorrect || 0) + sessionStats.correct,
+            totalQuestions: (existing.totalQuestions || 0) + sessionStats.total,
+            sessions: (existing.sessions || 0) + 1,
+            lastDate: new Date().toLocaleDateString(),
+          };
+          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+          setLastPerf(updated);
+        } catch(e) {}
+      }
+
       function submitAnswers() {
-        let results;
+        let results, numCorrect, totalQs, ratio;
+
         if (exercise.type === 'numbers') {
           const given = numberInput.trim();
           const correct = given === exercise.digits;
@@ -869,17 +944,28 @@
           }
           const partialRatio = correct ? 1 : matched / exercise.digits.length;
           results = [{ kind: 'numbers', digits: exercise.digits, given, correct, partialRatio, matched, tip: NUMBER_TIPS[Math.floor(Math.random() * NUMBER_TIPS.length)] }];
+          numCorrect = correct ? 1 : 0; totalQs = 1; ratio = partialRatio;
+        } else if (exercise.type === 'words') {
+          const userWords = wordInput.toLowerCase().split(/[\s,;\n]+/).map(w => w.trim()).filter(w => w.length > 0);
+          const targetLower = exercise.words.map(w => w.toLowerCase());
+          const recalled = exercise.words.filter(w => userWords.includes(w.toLowerCase()));
+          const missed = exercise.words.filter(w => !userWords.includes(w.toLowerCase()));
+          const extra = userWords.filter(w => !targetLower.includes(w));
+          numCorrect = recalled.length; totalQs = exercise.words.length;
+          ratio = numCorrect / totalQs;
+          results = [{ kind: 'words', words: exercise.words, recalled, missed, extra, correct: recalled.length === exercise.words.length, ratio, tip: WORD_TIPS[Math.floor(Math.random() * WORD_TIPS.length)] }];
         } else {
           results = exercise.questions.map(q => {
             const given = choiceAnswers[q.id] || '';
             const correct = given === q.answer;
             return { kind: q.kind, prompt: q.prompt, given, answer: q.answer, correct, tip: NAME_TIPS[Math.floor(Math.random() * NAME_TIPS.length)] };
           });
+          numCorrect = results.filter(r => r.correct).length;
+          totalQs = results.length; ratio = numCorrect / totalQs;
         }
 
-        const numCorrect = results.filter(r => r.correct).length;
-        const ratio = numCorrect / results.length;
-        setStats(prev => ({ correct: prev.correct + numCorrect, total: prev.total + results.length, count: prev.count + 1 }));
+        const newStats = { correct: stats.correct + numCorrect, total: stats.total + totalQs, count: stats.count + 1 };
+        setStats(newStats);
 
         const newScores = [...recentScores.slice(-4), ratio];
         setRecentScores(newScores);
@@ -891,6 +977,7 @@
         }
         setLevel(newLevel);
         nextLevelRef.current = newLevel;
+        savePerf(newLevel, newStats);
         setFeedbackData(results);
         setPhase('feedback');
       }
@@ -922,15 +1009,29 @@
                   onChange={e => setDurationMins(Math.max(1, Math.min(60, Number(e.target.value))))} />
               </div>
             </div>
+            {lastPerf && (
+              <div className="panel" style={{ borderLeftColor: 'var(--gold)' }}>
+                <div style={{ color: 'var(--muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>Last Session</div>
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px' }}>Level <strong style={{ color: 'var(--lime)' }}>{lastPerf.level}</strong></span>
+                  <span style={{ fontSize: '13px' }}>Lifetime accuracy <strong style={{ color: 'var(--cyan)' }}>{lastPerf.totalQuestions > 0 ? Math.round((lastPerf.totalCorrect / lastPerf.totalQuestions) * 100) : 0}%</strong></span>
+                  <span style={{ fontSize: '13px' }}>{lastPerf.sessions} session{lastPerf.sessions !== 1 ? 's' : ''}</span>
+                  {lastPerf.lastDate && <span style={{ color: 'var(--muted)', fontSize: '12px' }}>Last: {lastPerf.lastDate}</span>}
+                </div>
+              </div>
+            )}
             <div className="panel">
               <div className="section-head"><div className="section-title">What You'll Practice</div></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--muted)', fontSize: '13px', lineHeight: '1.6' }}>
                 <div><span style={{ color: 'var(--lime)' }}>■</span> <strong style={{ color: 'var(--text)' }}>Number Strings</strong> — Memorize digit sequences, then recall them exactly</div>
-                <div><span style={{ color: 'var(--cyan)' }}>■</span> <strong style={{ color: 'var(--text)' }}>Names & Details</strong> — Study people with face descriptions and personal details, then answer questions</div>
-                <div style={{ marginTop: '4px' }}>Difficulty adapts to your performance — harder when you're succeeding, easier when you're struggling.</div>
+                <div><span style={{ color: 'var(--gold)' }}>■</span> <strong style={{ color: 'var(--text)' }}>Word Lists</strong> — Memorize a set of words, then type back as many as you can (any order)</div>
+                <div><span style={{ color: 'var(--cyan)' }}>■</span> <strong style={{ color: 'var(--text)' }}>Names & Details</strong> — Study people with face descriptions and details, then answer questions</div>
+                <div style={{ marginTop: '4px' }}>Difficulty adapts to your performance. Your level carries over between sessions.</div>
               </div>
             </div>
-            <button className="btn" style={{ width: '100%', padding: '14px', fontSize: '14px', marginTop: '8px' }} onClick={startSession}>Start Session →</button>
+            <button className="btn" style={{ width: '100%', padding: '14px', fontSize: '14px', marginTop: '8px' }} onClick={startSession}>
+              {lastPerf ? `Resume at Level ${nextLevelRef.current} →` : 'Start Session →'}
+            </button>
           </div>
         </div>
       );
@@ -1000,6 +1101,18 @@
                 </div>
               )}
 
+              {exercise.type === 'words' && (
+                <div className="panel">
+                  <div className="section-title" style={{ marginBottom: '12px' }}>Memorize these words</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '8px 0' }}>
+                    {exercise.words.map((word, i) => (
+                      <span key={i} className="memory-word-chip">{word}</span>
+                    ))}
+                  </div>
+                  <div style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '10px' }}>{exercise.words.length} words — any order counts. Try linking them into a vivid story.</div>
+                </div>
+              )}
+
               {exercise.type === 'names' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div className="section-title" style={{ marginBottom: '2px' }}>Memorize these people</div>
@@ -1024,6 +1137,17 @@
                   <input className="in" type="text" inputMode="numeric" placeholder="Enter digits..." value={numberInput}
                     onChange={e => setNumberInput(e.target.value.replace(/\D/g, ''))} autoFocus />
                   <button className="btn" style={{ marginTop: '10px', width: '100%' }} disabled={numberInput.length === 0} onClick={submitAnswers}>Submit Answer</button>
+                </div>
+              )}
+
+              {exercise.type === 'words' && (
+                <div className="panel">
+                  <div className="section-title" style={{ marginBottom: '10px' }}>Recall the word list</div>
+                  <div style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '12px' }}>Type every word you remember — spaces, commas, or new lines. Order doesn't matter.</div>
+                  <textarea className="in" style={{ minHeight: '100px', resize: 'vertical' }}
+                    placeholder="apple, bridge, rocket..." value={wordInput}
+                    onChange={e => setWordInput(e.target.value)} autoFocus />
+                  <button className="btn" style={{ marginTop: '10px', width: '100%' }} disabled={wordInput.trim().length === 0} onClick={submitAnswers}>Submit Answer</button>
                 </div>
               )}
 
@@ -1062,8 +1186,25 @@
                 <div key={i} className="panel" style={{ borderLeftColor: result.correct ? 'var(--lime)' : 'var(--red)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ color: result.correct ? 'var(--lime)' : 'var(--red)', fontSize: '16px', fontWeight: 800 }}>{result.correct ? '✓' : '✗'}</span>
-                    <span style={{ color: result.correct ? 'var(--lime)' : 'var(--red)', fontWeight: 700, fontSize: '13px' }}>{result.correct ? 'Correct' : 'Incorrect'}</span>
+                    <span style={{ color: result.correct ? 'var(--lime)' : 'var(--red)', fontWeight: 700, fontSize: '13px' }}>
+                      {result.kind === 'words' ? `${result.recalled.length}/${result.words.length} words recalled` : result.correct ? 'Correct' : 'Incorrect'}
+                    </span>
                   </div>
+
+                  {result.kind === 'words' && (
+                    <div>
+                      <div style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '8px' }}>The words were:</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: result.extra.length > 0 ? '10px' : 0 }}>
+                        {result.words.map((w, wi) => {
+                          const got = result.recalled.map(r => r.toLowerCase()).includes(w.toLowerCase());
+                          return <span key={wi} className="memory-word-chip" style={{ color: got ? 'var(--lime)' : 'var(--red)', borderColor: got ? 'var(--lime)' : 'var(--red)' }}>{w}</span>;
+                        })}
+                      </div>
+                      {result.extra.length > 0 && (
+                        <div style={{ color: 'var(--muted)', fontSize: '11px' }}>Not on the list: <span>{result.extra.join(', ')}</span></div>
+                      )}
+                    </div>
+                  )}
 
                   {result.kind === 'numbers' && (
                     <div>
@@ -1671,7 +1812,7 @@
         }
       }
 
-      if (showMemory) return <MemoryTrainingPage onBack={() => setShowMemory(false)} />;
+      if (showMemory) return <MemoryTrainingPage user={user} onBack={() => setShowMemory(false)} />;
 
       return (
         <>
