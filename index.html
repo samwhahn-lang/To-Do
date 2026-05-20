@@ -572,6 +572,88 @@
       text-transform: uppercase;
     }
 
+    /* Accomplishment Tracker */
+    .acc-nav {
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+    }
+
+    .acc-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--lime);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      padding: 12px 14px;
+    }
+
+    .acc-card-date {
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .acc-field { margin-bottom: 6px; }
+
+    .acc-field-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .acc-field-value {
+      font-size: 13px;
+      line-height: 1.45;
+      margin-top: 2px;
+    }
+
+    .acc-week-group { margin-bottom: 20px; }
+
+    .acc-week-header {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      color: var(--cyan);
+      display: flex;
+      font-size: 11px;
+      font-weight: 700;
+      gap: 8px;
+      letter-spacing: .08em;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .acc-gap-badge {
+      background: rgba(255,107,107,.1);
+      border: 1px solid var(--red);
+      border-radius: 3px;
+      color: var(--red);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      text-transform: uppercase;
+    }
+
+    .acc-export-box {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 12px;
+      resize: vertical;
+      width: 100%;
+    }
+
     /* Friendship Tracker */
     .friend-page-header {
       align-items: center;
@@ -1792,6 +1874,379 @@
       );
     }
 
+    function AccomplishmentsPage({ onBack, user }) {
+      const [entries, setEntries] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [pageError, setPageError] = useState(null);
+      const [view, setView] = useState('log');
+
+      const [formDate, setFormDate] = useState(getCurrentDate());
+      const [formDelivery, setFormDelivery] = useState('');
+      const [formManagement, setFormManagement] = useState('');
+      const [formUnblocking, setFormUnblocking] = useState('');
+      const [saving, setSaving] = useState(false);
+      const [editId, setEditId] = useState(null);
+      const [saved, setSaved] = useState(false);
+
+      const [summaryWindow, setSummaryWindow] = useState('week');
+      const [exportWindow, setExportWindow] = useState('30d');
+      const [copied, setCopied] = useState(false);
+
+      useEffect(() => { loadData(); }, []);
+
+      const existingForDate = entries.find(e => e.entry_date === formDate);
+      useEffect(() => {
+        if (existingForDate) {
+          setEditId(existingForDate.id);
+          setFormDelivery(existingForDate.delivery === 'none' ? '' : existingForDate.delivery);
+          setFormManagement(existingForDate.management === 'none' ? '' : existingForDate.management);
+          setFormUnblocking(existingForDate.unblocking === 'none' ? '' : existingForDate.unblocking);
+        } else {
+          setEditId(null);
+          setFormDelivery('');
+          setFormManagement('');
+          setFormUnblocking('');
+        }
+      }, [formDate, entries]);
+
+      async function loadData() {
+        setLoading(true);
+        setPageError(null);
+        try {
+          const { data, error } = await supabase
+            .from('accomplishments').select('*').eq('user_id', user.id)
+            .order('entry_date', { ascending: false });
+          if (error) throw error;
+          setEntries(data || []);
+        } catch (e) { setPageError(e.message); }
+        setLoading(false);
+      }
+
+      async function saveEntry() {
+        setSaving(true);
+        setSaved(false);
+        try {
+          const payload = {
+            delivery:   formDelivery.trim()   || 'none',
+            management: formManagement.trim() || 'none',
+            unblocking: formUnblocking.trim() || 'none'
+          };
+          if (editId) {
+            const { error } = await supabase.from('accomplishments').update(payload).eq('id', editId);
+            if (error) throw error;
+          } else {
+            const { error } = await supabase.from('accomplishments')
+              .insert([{ ...payload, user_id: user.id, entry_date: formDate }]);
+            if (error) throw error;
+          }
+          setSaved(true);
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+        setSaving(false);
+      }
+
+      async function deleteEntry(id) {
+        if (!confirm('Delete this entry?')) return;
+        try {
+          const { error } = await supabase.from('accomplishments').delete().eq('id', id);
+          if (error) throw error;
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+      }
+
+      function jumpToEdit(entry) {
+        setFormDate(entry.entry_date);
+        setSaved(false);
+        setView('log');
+      }
+
+      function shiftDate(delta) {
+        const d = new Date(formDate + 'T12:00:00');
+        d.setDate(d.getDate() + delta);
+        const next = d.toISOString().split('T')[0];
+        if (delta > 0 && next > getCurrentDate()) return;
+        setFormDate(next);
+        setSaved(false);
+      }
+
+      function getMondayOf(ds) {
+        const d = new Date(ds + 'T12:00:00');
+        const day = d.getDay();
+        d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+        return d.toISOString().split('T')[0];
+      }
+
+      function weekLabel(mondayStr) {
+        const mon = new Date(mondayStr + 'T12:00:00');
+        const fri = new Date(mondayStr + 'T12:00:00');
+        fri.setDate(mon.getDate() + 4);
+        const o = { month: 'short', day: 'numeric' };
+        return `${mon.toLocaleDateString('en-US', o)} – ${fri.toLocaleDateString('en-US', { ...o, year: 'numeric' })}`;
+      }
+
+      function weekGaps(mondayStr, weekEntries) {
+        const today = getCurrentDate();
+        const entryDates = new Set(weekEntries.map(e => e.entry_date));
+        const gaps = [];
+        for (let i = 0; i < 5; i++) {
+          const d = new Date(mondayStr + 'T12:00:00');
+          d.setDate(d.getDate() + i);
+          const ds = d.toISOString().split('T')[0];
+          if (ds > today) break;
+          if (!entryDates.has(ds)) {
+            gaps.push(ds);
+          } else {
+            const e = weekEntries.find(x => x.entry_date === ds);
+            if (e && e.delivery === 'none' && e.management === 'none' && e.unblocking === 'none')
+              gaps.push(ds + ':allnone');
+          }
+        }
+        return gaps;
+      }
+
+      function buildWeekGroups() {
+        const map = {};
+        for (const e of entries) {
+          const w = getMondayOf(e.entry_date);
+          if (!map[w]) map[w] = [];
+          map[w].push(e);
+        }
+        return Object.entries(map)
+          .sort(([a], [b]) => b.localeCompare(a))
+          .map(([w, we]) => ({
+            key: w, label: weekLabel(w),
+            entries: we.sort((a, b) => a.entry_date.localeCompare(b.entry_date)),
+            gaps: weekGaps(w, we)
+          }));
+      }
+
+      function buildMonthGroups() {
+        const map = {};
+        for (const e of entries) {
+          const m = e.entry_date.slice(0, 7);
+          if (!map[m]) map[m] = [];
+          map[m].push(e);
+        }
+        return Object.entries(map)
+          .sort(([a], [b]) => b.localeCompare(a))
+          .map(([m, me]) => ({
+            key: m,
+            label: new Date(m + '-15T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            entries: me.sort((a, b) => a.entry_date.localeCompare(b.entry_date))
+          }));
+      }
+
+      function buildExport() {
+        const cutoff = exportWindow === '30d' ? getDateDaysAgo(30)
+                     : exportWindow === '90d' ? getDateDaysAgo(90) : null;
+        const filtered = cutoff ? entries.filter(e => e.entry_date >= cutoff) : entries;
+        const nn = v => v && v !== 'none';
+        const section = (label, field) => {
+          const items = filtered.filter(e => nn(e[field]));
+          if (!items.length) return '';
+          return `**${label}**\n${items.map(e => `• ${e[field]} (${e.entry_date})`).join('\n')}`;
+        };
+        return [section('Delivery', 'delivery'), section('Management', 'management'), section('Unblocking', 'unblocking')]
+          .filter(Boolean).join('\n\n');
+      }
+
+      function copyExport() {
+        const text = buildExport();
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }).catch(() => {});
+      }
+
+      const nn = v => v && v !== 'none';
+
+      const fmtDate = (ds, opts) =>
+        new Date(ds + 'T12:00:00').toLocaleDateString('en-US', opts);
+
+      function SummaryEntryList({ groupEntries }) {
+        return (
+          <>
+            {[['Delivery', 'delivery'], ['Management', 'management'], ['Unblocking', 'unblocking']].map(([label, field]) => {
+              const items = groupEntries.filter(e => nn(e[field]));
+              if (!items.length) return null;
+              return (
+                <div key={field} style={{ marginBottom: '8px' }}>
+                  <div className="acc-field-label" style={{ marginBottom: '4px' }}>{label}</div>
+                  {items.map(e => (
+                    <div key={e.id} style={{ fontSize: '13px', marginBottom: '4px', paddingLeft: '8px', borderLeft: '2px solid var(--line)', lineHeight: 1.45 }}>
+                      <span style={{ color: 'var(--gold)', fontSize: '11px', marginRight: '8px' }}>
+                        {fmtDate(e.entry_date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </span>
+                      {e[field]}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </>
+        );
+      }
+
+      if (loading) return (
+        <div>
+          <button className="btn gray" style={{ marginBottom: '16px' }} onClick={onBack}>← Back</button>
+          <div className="loading">Loading…</div>
+        </div>
+      );
+
+      return (
+        <div>
+          <div className="friend-page-header">
+            <button className="btn gray" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={onBack}>← Back</button>
+            <h1 style={{ color: 'var(--lime)', fontWeight: 800, fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Accomplishments</h1>
+            <div style={{ color: 'var(--muted)', fontSize: '11px' }}>{entries.length} entries</div>
+          </div>
+
+          <div className="acc-nav">
+            {[['log', 'Log'], ['history', 'History'], ['summary', 'Summary'], ['export', 'Export']].map(([v, label]) => (
+              <button key={v} className={`btn ${view === v ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 10px' }}
+                onClick={() => setView(v)}>{label}</button>
+            ))}
+          </div>
+
+          {pageError && <div className="panel error">{pageError}</div>}
+
+          {view === 'log' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <button className="btn gray" style={{ fontSize: '12px', padding: '5px 10px' }} onClick={() => shiftDate(-1)}>←</button>
+                <input type="date" className="in" style={{ flex: 'none', width: 'auto' }} value={formDate}
+                  onChange={e => { setFormDate(e.target.value); setSaved(false); }} />
+                <button className="btn gray" style={{ fontSize: '12px', padding: '5px 10px' }} onClick={() => shiftDate(1)}>→</button>
+                {editId
+                  ? <span style={{ color: 'var(--cyan)', fontSize: '11px' }}>Editing saved entry</span>
+                  : <span style={{ color: 'var(--muted)', fontSize: '11px' }}>No entry for this date</span>}
+              </div>
+
+              {[
+                ['delivery',   'Delivery',   'What did you ship, complete, or hand off?'],
+                ['management', 'Management', 'What did you do for your team or a direct report?'],
+                ['unblocking', 'Unblocking', 'What obstacle did you remove?'],
+              ].map(([key, label, placeholder]) => {
+                const val = key === 'delivery' ? formDelivery : key === 'management' ? formManagement : formUnblocking;
+                const setter = key === 'delivery' ? setFormDelivery : key === 'management' ? setFormManagement : setFormUnblocking;
+                return (
+                  <div key={key} style={{ marginBottom: '12px' }}>
+                    <div className="acc-field-label" style={{ marginBottom: '4px' }}>{label}</div>
+                    <textarea className="in" rows={2} placeholder={placeholder} value={val}
+                      onChange={e => { setter(e.target.value); setSaved(false); }}
+                      style={{ width: '100%', resize: 'vertical' }} />
+                  </div>
+                );
+              })}
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn" onClick={saveEntry} disabled={saving}>
+                  {saving ? 'Saving…' : editId ? 'Update Entry' : 'Save Entry'}
+                </button>
+                {saved && <span style={{ color: 'var(--lime)', fontSize: '12px' }}>Saved</span>}
+                {editId && (
+                  <button className="btn gray" style={{ fontSize: '11px', marginLeft: 'auto', borderColor: 'var(--red)', color: 'var(--red)' }}
+                    onClick={() => deleteEntry(editId)}>Delete</button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {view === 'history' && (
+            <div>
+              {entries.length === 0 ? (
+                <div className="panel" style={{ color: 'var(--muted)', textAlign: 'center' }}>No entries yet.</div>
+              ) : entries.map(entry => (
+                <div key={entry.id} className="acc-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div className="acc-card-date">
+                      {fmtDate(entry.entry_date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="btn gray" style={{ fontSize: '10px', padding: '3px 7px' }} onClick={() => jumpToEdit(entry)}>Edit</button>
+                      <button className="btn gray" style={{ fontSize: '10px', padding: '3px 7px', borderColor: 'var(--red)', color: 'var(--red)' }}
+                        onClick={() => deleteEntry(entry.id)}>×</button>
+                    </div>
+                  </div>
+                  {[['Delivery', entry.delivery], ['Management', entry.management], ['Unblocking', entry.unblocking]].map(([label, val]) =>
+                    nn(val) ? (
+                      <div key={label} className="acc-field">
+                        <div className="acc-field-label">{label}</div>
+                        <div className="acc-field-value">{val}</div>
+                      </div>
+                    ) : null
+                  )}
+                  {!nn(entry.delivery) && !nn(entry.management) && !nn(entry.unblocking) && (
+                    <div style={{ color: 'var(--muted)', fontSize: '12px', fontStyle: 'italic' }}>All none</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === 'summary' && (
+            <div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+                {[['week', 'By Week'], ['month', 'By Month']].map(([k, label]) => (
+                  <button key={k} className={`btn ${summaryWindow === k ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 10px' }}
+                    onClick={() => setSummaryWindow(k)}>{label}</button>
+                ))}
+              </div>
+              {entries.length === 0 ? (
+                <div className="panel" style={{ color: 'var(--muted)', textAlign: 'center' }}>No entries to summarize yet.</div>
+              ) : summaryWindow === 'week' ? (
+                buildWeekGroups().map(group => (
+                  <div key={group.key} className="acc-week-group">
+                    <div className="acc-week-header">
+                      {group.label} — {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
+                      {group.gaps.length > 0 && <span className="acc-gap-badge">{group.gaps.length} gap{group.gaps.length > 1 ? 's' : ''}</span>}
+                    </div>
+                    <SummaryEntryList groupEntries={group.entries} />
+                    {group.gaps.length > 0 && (
+                      <div style={{ color: 'var(--red)', fontSize: '11px', marginTop: '6px' }}>
+                        Gaps: {group.gaps.map(g => {
+                          const ds = g.replace(':allnone', '');
+                          const fmt = fmtDate(ds, { weekday: 'short', month: 'short', day: 'numeric' });
+                          return g.endsWith(':allnone') ? `${fmt} (all none)` : fmt;
+                        }).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                buildMonthGroups().map(group => (
+                  <div key={group.key} className="acc-week-group">
+                    <div className="acc-week-header">
+                      {group.label} — {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
+                    </div>
+                    <SummaryEntryList groupEntries={group.entries} />
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {view === 'export' && (
+            <div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                {[['30d', 'Last 30 days'], ['90d', 'Last 90 days'], ['all', 'All time']].map(([k, label]) => (
+                  <button key={k} className={`btn ${exportWindow === k ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 10px' }}
+                    onClick={() => setExportWindow(k)}>{label}</button>
+                ))}
+              </div>
+              <textarea className="acc-export-box" rows={18} readOnly value={buildExport()} />
+              <div style={{ marginTop: '8px' }}>
+                <button className="btn cyan" style={{ fontSize: '11px' }} onClick={copyExport}>
+                  {copied ? 'Copied!' : 'Copy to Clipboard'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const FRIEND_TIER_DEFAULTS = {
       close:     { contact: 21,  inperson: 90  },
       maintain:  { contact: 42,  inperson: 180 },
@@ -2199,6 +2654,7 @@
     function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
       const [showMemory, setShowMemory] = useState(false);
       const [showFriendship, setShowFriendship] = useState(false);
+      const [showAccomplishments, setShowAccomplishments] = useState(false);
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
       const [undoStack, setUndoStack] = useState([]);
@@ -2330,6 +2786,7 @@
 
       if (showMemory) return <MemoryTrainingPage user={user} onBack={() => setShowMemory(false)} />;
       if (showFriendship) return <FriendshipPage user={user} onBack={() => setShowFriendship(false)} />;
+      if (showAccomplishments) return <AccomplishmentsPage user={user} onBack={() => setShowAccomplishments(false)} />;
 
       return (
         <>
@@ -2340,6 +2797,7 @@
             <div className="left">
               <button className="btn" onClick={() => setShowMemory(true)}>Memory Training</button>
               <button className="btn" onClick={() => setShowFriendship(true)}>Friendships</button>
+              <button className="btn" onClick={() => setShowAccomplishments(true)}>Accomplishments</button>
               <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
               <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
               <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
