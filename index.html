@@ -98,6 +98,42 @@
       gap: 8px;
     }
 
+    .bar-top {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      width: 100%;
+    }
+
+    .bar-groups {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .bar-group-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .bar-group-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
     .btn {
       background: transparent;
       border: 1px solid var(--lime);
@@ -2853,29 +2889,46 @@
           <div className="tag">Task Protocol</div>
 
           <div className="bar">
-            <div className="left">
-              <button className="btn" onClick={() => setShowMemory(true)}>Memory Training</button>
-              <button className="btn" onClick={() => setShowFriendship(true)}>Friendships</button>
-              <button className="btn" onClick={() => setShowAccomplishments(true)}>Accomplishments</button>
-              <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
-              <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
-              <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
-              <button
-                className="btn gray"
-                onClick={applyUndo}
-                disabled={undoStack.length === 0}
-                title={undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].label}` : "Nothing to undo"}
-              >Undo</button>
+            <div className="bar-top">
+              <div className="left">
+                <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
+                <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
+                <button
+                  className="btn gray"
+                  onClick={applyUndo}
+                  disabled={undoStack.length === 0}
+                  title={undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].label}` : "Nothing to undo"}
+                >Undo</button>
+              </div>
+              <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
             </div>
-            <button className="btn gray" onClick={() => supabase.auth.signOut()}>Sign Out</button>
-            <div style={{ width: '100%', borderTop: '1px solid var(--line)', paddingTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {sections.map(section => (
-                <button key={section.id} className="btn gray" onClick={() => scrollToId(`section-${section.id}`)}>
-                  {section.name}
-                </button>
-              ))}
-              <button className="btn cyan" onClick={() => scrollToLearning('learning-idioms')}>Idioms</button>
-              <button className="btn cyan" onClick={() => scrollToLearning('learning-vocab')}>Vocab</button>
+            <div className="bar-groups">
+              <div className="bar-group">
+                <div className="bar-group-label">Skill Building</div>
+                <div className="bar-group-btns">
+                  <button className="btn cyan" onClick={() => setShowMemory(true)}>Memory Training</button>
+                  <button className="btn cyan" onClick={() => scrollToLearning('learning-idioms')}>Idioms</button>
+                  <button className="btn cyan" onClick={() => scrollToLearning('learning-vocab')}>Vocab</button>
+                </div>
+              </div>
+              <div className="bar-group">
+                <div className="bar-group-label">Tracking</div>
+                <div className="bar-group-btns">
+                  <button className="btn" onClick={() => setShowAccomplishments(true)}>Accomplishments</button>
+                  <button className="btn" onClick={() => setShowFriendship(true)}>Friendships</button>
+                </div>
+              </div>
+              <div className="bar-group">
+                <div className="bar-group-label">To-Do List</div>
+                <div className="bar-group-btns">
+                  {sections.map(section => (
+                    <button key={section.id} className="btn gray" onClick={() => scrollToId(`section-${section.id}`)}>
+                      {section.name}
+                    </button>
+                  ))}
+                  <button className="btn gray" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
+                </div>
+              </div>
             </div>
           </div>
 
