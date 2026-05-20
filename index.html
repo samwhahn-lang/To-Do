@@ -571,6 +571,81 @@
       letter-spacing: .1em;
       text-transform: uppercase;
     }
+
+    /* Friendship Tracker */
+    .friend-page-header {
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--panel2);
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .friend-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      padding: 12px 14px;
+    }
+
+    .friend-card.overdue {
+      border-left: 4px solid var(--red);
+    }
+
+    .friend-tier {
+      border: 1px solid;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      padding: 2px 6px;
+      text-transform: uppercase;
+    }
+
+    .friend-tier.close    { border-color: var(--lime); color: var(--lime); }
+    .friend-tier.maintain { border-color: var(--cyan); color: var(--cyan); }
+    .friend-tier.dont_lose { border-color: var(--gold); color: var(--gold); }
+
+    .friend-log-form {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      margin-top: 10px;
+      padding: 12px;
+    }
+
+    .friend-history {
+      border-top: 1px solid var(--line);
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+
+    .friend-interaction-row {
+      border-left: 2px solid var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+      padding-left: 8px;
+    }
+
+    .friend-interaction-row.one-way {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .friend-overdue-section {
+      background: rgba(255,107,107,.05);
+      border: 1px solid rgba(255,107,107,.2);
+      border-radius: 6px;
+      margin-bottom: 16px;
+      padding: 12px;
+    }
   </style>
 </head>
 
@@ -1717,8 +1792,413 @@
       );
     }
 
+    const FRIEND_TIER_DEFAULTS = {
+      close:     { contact: 21,  inperson: 90  },
+      maintain:  { contact: 42,  inperson: 180 },
+      dont_lose: { contact: 90,  inperson: 365 }
+    };
+    const FRIEND_TIER_LABELS = { close: 'Close', maintain: 'Maintain', dont_lose: "Don't Lose" };
+
+    function FriendCard({
+      friend, friendInteractions, stats,
+      isLogOpen, logType, logDate, logNote, logSaving,
+      onOpenLog, onSaveLog, onCancelLog, onSetLogType, onSetLogDate, onSetLogNote,
+      isHistoryOpen, onToggleHistory, onDeleteInteraction,
+      isEditOpen, editData, onStartEdit, onSaveEdit, onCancelEdit, onSetEditData,
+      onDeleteFriend
+    }) {
+      function fmtDays(days) {
+        if (days === null) return 'never';
+        if (days === 0) return 'today';
+        return `${days}d ago`;
+      }
+
+      if (isEditOpen) return (
+        <div className="friend-card">
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <input className="in" style={{ flex: 2, minWidth: '120px' }} value={editData.name}
+              onChange={e => onSetEditData({ ...editData, name: e.target.value })} placeholder="Name" />
+            <input className="in" style={{ flex: 1, minWidth: '100px' }} value={editData.city}
+              onChange={e => onSetEditData({ ...editData, city: e.target.value })} placeholder="City (optional)" />
+          </div>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            {['close', 'maintain', 'dont_lose'].map(t => (
+              <button key={t} className={`btn ${editData.tier === t ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 8px' }}
+                onClick={() => onSetEditData({ ...editData, tier: t, contact_interval_days: FRIEND_TIER_DEFAULTS[t].contact, inperson_interval_days: FRIEND_TIER_DEFAULTS[t].inperson })}>
+                {FRIEND_TIER_LABELS[t]}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <span style={{ color: 'var(--muted)', fontSize: '11px', textTransform: 'uppercase' }}>Contact every</span>
+            <input className="in" type="number" min={1} style={{ width: '64px', flex: 'none' }}
+              value={editData.contact_interval_days}
+              onChange={e => onSetEditData({ ...editData, contact_interval_days: e.target.value })} />
+            <span style={{ color: 'var(--muted)', fontSize: '11px' }}>days</span>
+            <span style={{ color: 'var(--muted)', fontSize: '11px', textTransform: 'uppercase', marginLeft: '8px' }}>In-person every</span>
+            <input className="in" type="number" min={1} style={{ width: '64px', flex: 'none' }}
+              value={editData.inperson_interval_days}
+              onChange={e => onSetEditData({ ...editData, inperson_interval_days: e.target.value })} />
+            <span style={{ color: 'var(--muted)', fontSize: '11px' }}>days</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="btn" style={{ fontSize: '11px' }} onClick={onSaveEdit}>Save</button>
+            <button className="btn gray" style={{ fontSize: '11px' }} onClick={onCancelEdit}>Cancel</button>
+            <button className="btn gray" style={{ fontSize: '11px', marginLeft: 'auto', borderColor: 'var(--red)', color: 'var(--red)' }}
+              onClick={() => onDeleteFriend(friend.id, friend.name)}>Delete</button>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className={`friend-card${stats.contactOverdue ? ' overdue' : ''}`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            <span style={{ fontWeight: 800, fontSize: '14px' }}>{friend.name}</span>
+            <span className={`friend-tier ${friend.tier}`}>{FRIEND_TIER_LABELS[friend.tier]}</span>
+            {friend.city && <span style={{ color: 'var(--muted)', fontSize: '11px' }}>{friend.city}</span>}
+            {stats.inPersonOverdue && (
+              <span title="In-person gap exceeded" style={{ color: 'var(--gold)', fontSize: '11px', fontWeight: 700 }}>⚠ In-person overdue</span>
+            )}
+          </div>
+          <div style={{ fontSize: '12px', color: stats.contactOverdue ? 'var(--red)' : 'var(--muted)', marginBottom: '8px' }}>
+            Last contact: {fmtDays(stats.daysSinceContact)}
+            {stats.contactOverdue && stats.daysSinceContact !== null && (
+              <span> — {stats.overdueBy}d overdue</span>
+            )}
+            {stats.daysSinceInPerson !== null && (
+              <span style={{ color: 'var(--muted)', marginLeft: '12px' }}>In-person: {fmtDays(stats.daysSinceInPerson)}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button className="btn cyan" style={{ fontSize: '11px', padding: '5px 8px' }}
+              onClick={() => isLogOpen ? onCancelLog() : onOpenLog(friend.id)}>
+              {isLogOpen ? 'Cancel' : '+ Log'}
+            </button>
+            <button className="btn gray" style={{ fontSize: '11px', padding: '5px 8px' }}
+              onClick={() => onToggleHistory(friend.id)}>
+              {isHistoryOpen ? 'Hide' : `History (${friendInteractions.length})`}
+            </button>
+            <button className="btn gray" style={{ fontSize: '11px', padding: '5px 8px' }}
+              onClick={() => onStartEdit(friend)}>Edit</button>
+          </div>
+
+          {isLogOpen && (
+            <div className="friend-log-form">
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                {[['in_person', 'In Person'], ['text_exchange', 'Text / Call'], ['one_way_checkin', 'One-Way']].map(([val, label]) => (
+                  <button key={val} className={`btn ${logType === val ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 8px' }}
+                    onClick={() => onSetLogType(val)}>{label}</button>
+                ))}
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <input type="date" className="in" style={{ width: 'auto' }} value={logDate} onChange={e => onSetLogDate(e.target.value)} />
+              </div>
+              <textarea className="in" rows={2} placeholder="Notes (optional)" value={logNote} onChange={e => onSetLogNote(e.target.value)}
+                style={{ width: '100%', resize: 'vertical', marginBottom: '8px' }} />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn" style={{ fontSize: '11px' }} onClick={onSaveLog} disabled={logSaving}>{logSaving ? 'Saving…' : 'Save'}</button>
+                <button className="btn gray" style={{ fontSize: '11px' }} onClick={onCancelLog}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {isHistoryOpen && (
+            <div className="friend-history">
+              {friendInteractions.length === 0 ? (
+                <div style={{ color: 'var(--muted)', fontSize: '12px' }}>No interactions logged yet.</div>
+              ) : (
+                friendInteractions.map(i => (
+                  <div key={i.id} className={`friend-interaction-row${i.interaction_type === 'one_way_checkin' ? ' one-way' : ''}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{i.interacted_at}</span>
+                        {' — '}
+                        <span>{i.interaction_type === 'in_person' ? 'In Person' : i.interaction_type === 'text_exchange' ? 'Text / Call' : 'One-Way'}</span>
+                        {i.notes && <div style={{ marginTop: '2px', opacity: .85 }}>{i.notes}</div>}
+                      </div>
+                      <button className="icon" style={{ fontSize: '11px', width: '22px', height: '22px', marginLeft: '8px', flexShrink: 0 }}
+                        onClick={() => onDeleteInteraction(i.id)}>×</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function FriendshipPage({ onBack, user }) {
+      const [friends, setFriends] = useState([]);
+      const [interactions, setInteractions] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [pageError, setPageError] = useState(null);
+
+      const [openFriend, setOpenFriend] = useState(null);
+      const [logFor, setLogFor] = useState(null);
+      const [logType, setLogType] = useState('text_exchange');
+      const [logDate, setLogDate] = useState(getCurrentDate());
+      const [logNote, setLogNote] = useState('');
+      const [logSaving, setLogSaving] = useState(false);
+
+      const [editFriend, setEditFriend] = useState(null);
+      const [editData, setEditData] = useState({});
+
+      const [addOpen, setAddOpen] = useState(false);
+      const [addName, setAddName] = useState('');
+      const [addCity, setAddCity] = useState('');
+      const [addTier, setAddTier] = useState('maintain');
+      const [addSaving, setAddSaving] = useState(false);
+
+      const [overdueOpen, setOverdueOpen] = useState(true);
+
+      useEffect(() => { loadData(); }, []);
+
+      async function loadData() {
+        setLoading(true);
+        setPageError(null);
+        try {
+          const { data: fData, error: fErr } = await supabase
+            .from('friends').select('*').eq('user_id', user.id).order('name');
+          if (fErr) throw fErr;
+
+          if (!fData.length) { setFriends([]); setInteractions([]); setLoading(false); return; }
+
+          const ids = fData.map(f => f.id);
+          const { data: iData, error: iErr } = await supabase
+            .from('friend_interactions').select('*').in('friend_id', ids)
+            .order('interacted_at', { ascending: false });
+          if (iErr) throw iErr;
+
+          setFriends(fData);
+          setInteractions(iData || []);
+        } catch (e) {
+          setPageError(e.message);
+        }
+        setLoading(false);
+      }
+
+      function computeStats(friend) {
+        const fi = interactions.filter(i => i.friend_id === friend.id);
+        const byDate = [...fi].sort((a, b) => b.interacted_at.localeCompare(a.interacted_at));
+        const lastAny = byDate[0];
+        const lastIP = byDate.find(i => i.interaction_type === 'in_person');
+        function daysDiff(dateStr) {
+          if (!dateStr) return null;
+          return Math.floor((new Date(getCurrentDate()) - new Date(dateStr)) / 86400000);
+        }
+        const daysSinceContact = daysDiff(lastAny?.interacted_at);
+        const inPersonBaseline = lastIP?.interacted_at || (friend.created_at ? friend.created_at.split('T')[0] : null);
+        const daysSinceInPerson = daysDiff(inPersonBaseline);
+        const contactOverdue = daysSinceContact === null || daysSinceContact > friend.contact_interval_days;
+        const inPersonOverdue = daysSinceInPerson === null || daysSinceInPerson > friend.inperson_interval_days;
+        const overdueBy = daysSinceContact === null ? 9999 : Math.max(0, daysSinceContact - friend.contact_interval_days);
+        return { daysSinceContact, daysSinceInPerson, contactOverdue, inPersonOverdue, overdueBy };
+      }
+
+      const overdueFriends = friends
+        .map(f => ({ friend: f, stats: computeStats(f) }))
+        .filter(({ stats }) => stats.contactOverdue)
+        .sort((a, b) => b.stats.overdueBy - a.stats.overdueBy);
+
+      function openLog(friendId) {
+        setLogFor(friendId);
+        setLogType('text_exchange');
+        setLogDate(getCurrentDate());
+        setLogNote('');
+        setEditFriend(null);
+        setOpenFriend(null);
+      }
+
+      async function saveLog() {
+        if (!logFor) return;
+        setLogSaving(true);
+        try {
+          const { error } = await supabase.from('friend_interactions').insert([{
+            friend_id: logFor, user_id: user.id,
+            interaction_type: logType, interacted_at: logDate,
+            notes: logNote.trim() || null
+          }]);
+          if (error) throw error;
+          setLogFor(null);
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+        setLogSaving(false);
+      }
+
+      async function addFriend(e) {
+        e.preventDefault();
+        if (!addName.trim()) return;
+        setAddSaving(true);
+        const def = FRIEND_TIER_DEFAULTS[addTier];
+        try {
+          const { error } = await supabase.from('friends').insert([{
+            user_id: user.id, name: addName.trim(),
+            city: addCity.trim() || null, tier: addTier,
+            contact_interval_days: def.contact, inperson_interval_days: def.inperson
+          }]);
+          if (error) throw error;
+          setAddName(''); setAddCity(''); setAddTier('maintain'); setAddOpen(false);
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+        setAddSaving(false);
+      }
+
+      function startEdit(friend) {
+        setEditFriend(friend.id);
+        setEditData({
+          name: friend.name, city: friend.city || '',
+          tier: friend.tier,
+          contact_interval_days: friend.contact_interval_days,
+          inperson_interval_days: friend.inperson_interval_days
+        });
+        setLogFor(null);
+        setOpenFriend(null);
+      }
+
+      async function saveEdit() {
+        try {
+          const { error } = await supabase.from('friends').update({
+            name: editData.name.trim(), city: editData.city.trim() || null,
+            tier: editData.tier,
+            contact_interval_days: parseInt(editData.contact_interval_days) || 1,
+            inperson_interval_days: parseInt(editData.inperson_interval_days) || 1
+          }).eq('id', editFriend);
+          if (error) throw error;
+          setEditFriend(null);
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+      }
+
+      async function deleteFriend(friendId, name) {
+        if (!confirm(`Remove ${name} from your list?`)) return;
+        try {
+          await supabase.from('friend_interactions').delete().eq('friend_id', friendId);
+          const { error } = await supabase.from('friends').delete().eq('id', friendId);
+          if (error) throw error;
+          if (editFriend === friendId) setEditFriend(null);
+          if (logFor === friendId) setLogFor(null);
+          if (openFriend === friendId) setOpenFriend(null);
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+      }
+
+      async function deleteInteraction(id) {
+        try {
+          const { error } = await supabase.from('friend_interactions').delete().eq('id', id);
+          if (error) throw error;
+          await loadData();
+        } catch (e) { setPageError(e.message); }
+      }
+
+      function toggleHistory(friendId) {
+        setOpenFriend(prev => prev === friendId ? null : friendId);
+      }
+
+      function renderCard(friend) {
+        const stats = computeStats(friend);
+        const fi = interactions
+          .filter(i => i.friend_id === friend.id)
+          .sort((a, b) => b.interacted_at.localeCompare(a.interacted_at));
+        return (
+          <FriendCard
+            key={friend.id}
+            friend={friend}
+            friendInteractions={fi}
+            stats={stats}
+            isLogOpen={logFor === friend.id}
+            logType={logType} logDate={logDate} logNote={logNote} logSaving={logSaving}
+            onOpenLog={openLog} onSaveLog={saveLog} onCancelLog={() => setLogFor(null)}
+            onSetLogType={setLogType} onSetLogDate={setLogDate} onSetLogNote={setLogNote}
+            isHistoryOpen={openFriend === friend.id}
+            onToggleHistory={toggleHistory}
+            onDeleteInteraction={deleteInteraction}
+            isEditOpen={editFriend === friend.id}
+            editData={editData}
+            onStartEdit={startEdit} onSaveEdit={saveEdit}
+            onCancelEdit={() => setEditFriend(null)}
+            onSetEditData={setEditData}
+            onDeleteFriend={deleteFriend}
+          />
+        );
+      }
+
+      if (loading) return (
+        <div>
+          <button className="btn gray" style={{ marginBottom: '16px' }} onClick={onBack}>← Back</button>
+          <div className="loading">Loading…</div>
+        </div>
+      );
+
+      return (
+        <div>
+          <div className="friend-page-header">
+            <button className="btn gray" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={onBack}>← Back</button>
+            <h1 style={{ color: 'var(--lime)', fontWeight: 800, fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Friendships</h1>
+            <button className="btn cyan" style={{ fontSize: '11px', padding: '5px 8px' }}
+              onClick={() => setAddOpen(o => !o)}>{addOpen ? 'Cancel' : '+ Friend'}</button>
+          </div>
+
+          {pageError && <div className="panel error">{pageError}</div>}
+
+          {addOpen && (
+            <div className="panel">
+              <form onSubmit={addFriend}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                  <input className="in" style={{ flex: 2 }} value={addName} onChange={e => setAddName(e.target.value)} placeholder="Name" autoFocus />
+                  <input className="in" style={{ flex: 1, minWidth: '120px' }} value={addCity} onChange={e => setAddCity(e.target.value)} placeholder="City (optional)" />
+                </div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  {['close', 'maintain', 'dont_lose'].map(t => (
+                    <button key={t} type="button" className={`btn ${addTier === t ? '' : 'gray'}`} style={{ fontSize: '11px' }}
+                      onClick={() => setAddTier(t)}>{FRIEND_TIER_LABELS[t]}</button>
+                  ))}
+                </div>
+                <div style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '10px' }}>
+                  {FRIEND_TIER_LABELS[addTier]}: contact every {FRIEND_TIER_DEFAULTS[addTier].contact}d · in-person every {FRIEND_TIER_DEFAULTS[addTier].inperson}d
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn" type="submit" disabled={addSaving}>{addSaving ? 'Adding…' : 'Add'}</button>
+                  <button className="btn gray" type="button" onClick={() => setAddOpen(false)}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {overdueFriends.length > 0 && (
+            <div className="friend-overdue-section">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: overdueOpen ? '10px' : 0 }}>
+                <span style={{ color: 'var(--red)', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                  Overdue — {overdueFriends.length}
+                </span>
+                <button className="btn gray" style={{ fontSize: '10px', padding: '3px 6px' }} onClick={() => setOverdueOpen(o => !o)}>
+                  {overdueOpen ? 'Collapse' : 'Expand'}
+                </button>
+              </div>
+              {overdueOpen && overdueFriends.map(({ friend }) => renderCard(friend))}
+            </div>
+          )}
+
+          {friends.length === 0 ? (
+            <div className="panel" style={{ textAlign: 'center' }}>
+              <div style={{ color: 'var(--muted)', marginBottom: '8px' }}>No friends added yet.</div>
+              <button className="btn cyan" style={{ fontSize: '11px' }} onClick={() => setAddOpen(true)}>+ Add your first friend</button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ color: 'var(--muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '8px' }}>
+                All — {friends.length}
+              </div>
+              {friends.map(f => renderCard(f))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function TaskApp({ user, sections, setSections, setError, loadSections, loadArchive, archive, showArchive, loadInfo }) {
       const [showMemory, setShowMemory] = useState(false);
+      const [showFriendship, setShowFriendship] = useState(false);
       const [showNewSection, setShowNewSection] = useState(false);
       const [newSectionName, setNewSectionName] = useState("");
       const [undoStack, setUndoStack] = useState([]);
@@ -1849,6 +2329,7 @@
       }
 
       if (showMemory) return <MemoryTrainingPage user={user} onBack={() => setShowMemory(false)} />;
+      if (showFriendship) return <FriendshipPage user={user} onBack={() => setShowFriendship(false)} />;
 
       return (
         <>
@@ -1858,6 +2339,7 @@
           <div className="bar">
             <div className="left">
               <button className="btn" onClick={() => setShowMemory(true)}>Memory Training</button>
+              <button className="btn" onClick={() => setShowFriendship(true)}>Friendships</button>
               <button className="btn" onClick={() => setShowNewSection(!showNewSection)}>+ New Section</button>
               <button className="btn gray" onClick={() => loadSections(user.id, true)}>Refresh</button>
               <button className="btn gray" onClick={loadArchive}>{showArchive ? "Hide Archive" : "History"}</button>
