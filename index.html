@@ -1891,6 +1891,7 @@
       const [summaryWindow, setSummaryWindow] = useState('week');
       const [exportWindow, setExportWindow] = useState('30d');
       const [copied, setCopied] = useState(false);
+      const [auditLog, setAuditLog] = useState([]);
 
       useEffect(() => { loadData(); }, []);
 
@@ -1913,11 +1914,16 @@
         setLoading(true);
         setPageError(null);
         try {
-          const { data, error } = await supabase
-            .from('accomplishments').select('*').eq('user_id', user.id)
-            .order('entry_date', { ascending: false });
-          if (error) throw error;
-          setEntries(data || []);
+          const [{ data: aData, error: aErr }, { data: auData, error: auErr }] = await Promise.all([
+            supabase.from('accomplishments').select('*').eq('user_id', user.id)
+              .is('deleted_at', null).order('entry_date', { ascending: false }),
+            supabase.from('accomplishment_audit').select('*').eq('user_id', user.id)
+              .order('created_at', { ascending: false }).limit(200)
+          ]);
+          if (aErr) throw aErr;
+          if (auErr) throw auErr;
+          setEntries(aData || []);
+          setAuditLog(auData || []);
         } catch (e) { setPageError(e.message); }
         setLoading(false);
       }
@@ -1931,14 +1937,23 @@
             management: formManagement.trim() || 'none',
             unblocking: formUnblocking.trim() || 'none'
           };
+          let resolvedId = editId;
           if (editId) {
             const { error } = await supabase.from('accomplishments').update(payload).eq('id', editId);
             if (error) throw error;
           } else {
-            const { error } = await supabase.from('accomplishments')
-              .insert([{ ...payload, user_id: user.id, entry_date: formDate }]);
+            const { data, error } = await supabase.from('accomplishments')
+              .insert([{ ...payload, user_id: user.id, entry_date: formDate }]).select();
             if (error) throw error;
+            resolvedId = data[0].id;
           }
+          await supabase.from('accomplishment_audit').insert([{
+            user_id: user.id,
+            accomplishment_id: resolvedId,
+            action: editId ? 'update' : 'insert',
+            entry_date: formDate,
+            snapshot: payload
+          }]);
           setSaved(true);
           await loadData();
         } catch (e) { setPageError(e.message); }
@@ -1948,8 +1963,19 @@
       async function deleteEntry(id) {
         if (!confirm('Delete this entry?')) return;
         try {
-          const { error } = await supabase.from('accomplishments').delete().eq('id', id);
+          const entry = entries.find(e => e.id === id);
+          const { error } = await supabase.from('accomplishments')
+            .update({ deleted_at: new Date().toISOString() }).eq('id', id);
           if (error) throw error;
+          if (entry) {
+            await supabase.from('accomplishment_audit').insert([{
+              user_id: user.id,
+              accomplishment_id: id,
+              action: 'delete',
+              entry_date: entry.entry_date,
+              snapshot: { delivery: entry.delivery, management: entry.management, unblocking: entry.unblocking }
+            }]);
+          }
           await loadData();
         } catch (e) { setPageError(e.message); }
       }
@@ -2103,7 +2129,7 @@
           </div>
 
           <div className="acc-nav">
-            {[['log', 'Log'], ['history', 'History'], ['summary', 'Summary'], ['export', 'Export']].map(([v, label]) => (
+            {[['log', 'Log'], ['history', 'History'], ['summary', 'Summary'], ['export', 'Export'], ['audit', 'Audit']].map(([v, label]) => (
               <button key={v} className={`btn ${view === v ? '' : 'gray'}`} style={{ fontSize: '11px', padding: '5px 10px' }}
                 onClick={() => setView(v)}>{label}</button>
             ))}
@@ -2241,6 +2267,39 @@
                   {copied ? 'Copied!' : 'Copy to Clipboard'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {view === 'audit' && (
+            <div>
+              {auditLog.length === 0 ? (
+                <div className="panel" style={{ color: 'var(--muted)', textAlign: 'center' }}>No audit events yet.</div>
+              ) : auditLog.map(event => (
+                <div key={event.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '8px', padding: '10px 12px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '4px' }}>
+                  <span className={`badge ${event.action === 'insert' ? 'b1' : event.action === 'update' ? 'b2' : 'b3'}`}
+                    style={{ flexShrink: 0, marginTop: '1px' }}>
+                    {event.action.toUpperCase()}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ marginBottom: '4px' }}>
+                      <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: '11px' }}>
+                        {fmtDate(event.entry_date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      <span style={{ color: 'var(--muted)', fontSize: '11px', marginLeft: '10px' }}>
+                        {new Date(event.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {['delivery', 'management', 'unblocking'].map(field =>
+                      event.snapshot[field] && event.snapshot[field] !== 'none' ? (
+                        <div key={field} style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '2px' }}>
+                          <span style={{ textTransform: 'uppercase', fontSize: '10px', fontWeight: 700, marginRight: '6px', color: 'var(--muted)' }}>{field}</span>
+                          {event.snapshot[field]}
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
