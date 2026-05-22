@@ -2854,6 +2854,11 @@
         const targetIndex = index + direction;
         if (index < 0 || targetIndex < 0 || targetIndex >= sections.length) return;
 
+        const a = sections[index];
+        const b = sections[targetIndex];
+        const aOrder = a.order_index ?? index;
+        const bOrder = b.order_index ?? targetIndex;
+
         const reordered = [...sections];
         [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
         const next = reordered.map((s, i) => ({ ...s, order_index: i }));
@@ -2862,14 +2867,18 @@
         setSections(next);
         cache.set(user.id, next);
 
+        // Three sequential steps avoid the unique constraint on (user_id, order_index):
+        // simultaneous updates would create a duplicate value in the intermediate state.
+        const tempIndex = (sections.length + 1) * 1000;
         try {
-          const results = await Promise.all(
-            next.map((s) =>
-              supabase.from("sections").update({ order_index: s.order_index }).eq("id", s.id).eq("user_id", user.id)
-            )
-          );
-          const failed = results.find((r) => r.error);
-          if (failed) throw failed.error;
+          let res = await supabase.from("sections").update({ order_index: tempIndex }).eq("id", a.id).eq("user_id", user.id);
+          if (res.error) throw res.error;
+
+          res = await supabase.from("sections").update({ order_index: aOrder }).eq("id", b.id).eq("user_id", user.id);
+          if (res.error) throw res.error;
+
+          res = await supabase.from("sections").update({ order_index: bOrder }).eq("id", a.id).eq("user_id", user.id);
+          if (res.error) throw res.error;
         } catch (e) {
           setSections(previous);
           cache.set(user.id, previous);
