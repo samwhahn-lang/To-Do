@@ -356,13 +356,6 @@
       margin: 8px 0 8px 24px;
     }
 
-    .section-nav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 14px;
-    }
-
     .history-day {
       margin-bottom: 14px;
     }
@@ -2929,7 +2922,13 @@
                 <div className="bar-group-label">To-Do List</div>
                 <div className="bar-group-btns">
                   {sections.map(section => (
-                    <button key={section.id} className="btn gray" onClick={() => scrollToId(`section-${section.id}`)}>
+                    <button key={section.id} className="btn gray" onClick={() => {
+                      const el = document.getElementById(`add-task-${section.id}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        el.querySelector('input')?.focus();
+                      }
+                    }}>
                       {section.name}
                     </button>
                   ))}
@@ -3015,27 +3014,6 @@
           {sections.length > 0 && totalTasksToday === 0 && (
             <div className="panel gold">
               No tasks found for today. Add a task below to get started.
-            </div>
-          )}
-
-          {sections.length > 1 && (
-            <div className="section-nav">
-              {sections.map((s) => (
-                <button
-                  key={s.id}
-                  className="btn gray"
-                  style={{ fontSize: "11px", padding: "4px 10px" }}
-                  onClick={() => {
-                    const el = document.getElementById(`add-task-${s.id}`);
-                    if (el) {
-                      el.scrollIntoView({ behavior: "smooth", block: "end" });
-                      el.querySelector("input")?.focus();
-                    }
-                  }}
-                >
-                  {s.name}
-                </button>
-              ))}
             </div>
           )}
 
