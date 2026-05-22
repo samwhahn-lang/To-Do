@@ -356,6 +356,13 @@
       margin: 8px 0 8px 24px;
     }
 
+    .section-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
     .history-day {
       margin-bottom: 14px;
     }
@@ -3011,6 +3018,27 @@
             </div>
           )}
 
+          {sections.length > 1 && (
+            <div className="section-nav">
+              {sections.map((s) => (
+                <button
+                  key={s.id}
+                  className="btn gray"
+                  style={{ fontSize: "11px", padding: "4px 10px" }}
+                  onClick={() => {
+                    const el = document.getElementById(`add-task-${s.id}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: "smooth", block: "end" });
+                      el.querySelector("input")?.focus();
+                    }
+                  }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {sections.map((section) => (
             <div className="panel" key={section.id} id={`section-${section.id}`}>
               <SectionComponent
@@ -3669,7 +3697,7 @@
 
       function renderTaskComposer(isInline) {
         return (
-          <form className={`row ${isInline ? "subtask-form" : ""}`} onSubmit={addTask}>
+          <form id={!isInline ? `add-task-${section.id}` : undefined} className={`row ${isInline ? "subtask-form" : ""}`} onSubmit={addTask}>
             <input
               className="in"
               ref={newTaskInputRef}
