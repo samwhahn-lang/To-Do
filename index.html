@@ -8,6 +8,11 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    Babel.registerPreset('react', {
+      plugins: [[Babel.availablePlugins['transform-react-jsx'], { runtime: 'classic' }]]
+    });
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -768,9 +773,50 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root"><div class="loading" style="padding-top:80px">Loading System...<br/><span id="_diag" style="font-size:11px;color:#555;margin-top:6px;display:block"></span></div></div>
 
-  <script type="text/babel">
+  <script>
+    (function() {
+      function diag(msg) {
+        var el = document.getElementById('_diag');
+        if (el) el.textContent = msg;
+      }
+      function fatal(msg) {
+        document.getElementById('root').innerHTML =
+          '<div class="panel error" style="margin:40px auto;max-width:600px;white-space:pre-wrap">' + msg + '</div>';
+      }
+
+      window.addEventListener('error', function(e) {
+        if (!window.__appMounted) {
+          fatal('Script error: ' + e.message + '\n\nFile: ' + e.filename + '\nLine: ' + e.lineno);
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function(e) {
+        if (!window.__appMounted) {
+          fatal('Unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+        }
+      });
+
+      setTimeout(function() {
+        if (!window.React)     return fatal('React failed to load from CDN. Check your network or try a different connection.');
+        if (!window.ReactDOM)  return fatal('ReactDOM failed to load from CDN.');
+        if (!window.supabase)  return fatal('Supabase failed to load from CDN.');
+        if (!window.Babel)     return fatal('Babel failed to load from CDN. The app cannot run without it.');
+        diag('CDN scripts loaded — transpiling...');
+      }, 2000);
+
+      setTimeout(function() {
+        if (!window.__appMounted) {
+          if (!window.React || !window.ReactDOM || !window.supabase || !window.Babel) return;
+          fatal('App script failed to initialize after 10s (no specific error was caught).\nOpen browser console (F12) to see details.');
+        }
+      }, 10000);
+    })();
+  </script>
+
+  <script type="text/babel" data-presets="react">
+    (function() {
     if (!window.React || !window.ReactDOM || !window.supabase) {
       document.getElementById("root").innerHTML =
         '<div class="panel error">Missing required CDN scripts. Check React, Babel, and Supabase script loading.</div>';
@@ -1505,12 +1551,36 @@
       }, [user]);
 
       useEffect(() => {
+        let settled = false;
+
+        function applySession(session, loadData) {
+          if (settled) return;
+          settled = true;
+          const nextUser = session?.user || null;
+          setUser(nextUser);
+          setLoading(false);
+          if (nextUser && loadData) {
+            const cached = cache.get(nextUser.id);
+            if (cached) setSections(cached);
+            ensureDailyTasks(getCurrentDate(), nextUser.id)
+              .catch((e) => console.warn("ensureDailyTasks:", e.message))
+              .finally(() => loadSections(nextUser.id, true).catch((e) => setError("Failed to load: " + e.message)));
+          }
+        }
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          applySession(session, true);
+        }).catch(() => {
+          applySession(null, false);
+        });
+
         const failsafe = setTimeout(() => {
-          setLoading((prev) => {
-            if (prev) setError("Startup took too long. If you are signed in, press Refresh.");
-            return false;
-          });
-        }, 9000);
+          if (!settled) {
+            settled = true;
+            setError("Startup took too long. If you are signed in, press Refresh.");
+            setLoading(false);
+          }
+        }, 5000);
 
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
           const nextUser = session?.user || null;
@@ -1528,7 +1598,7 @@
             return;
           }
 
-          if (nextUser) {
+          if (nextUser && settled) {
             const cached = cache.get(nextUser.id);
             if (cached) setSections(cached);
             ensureDailyTasks(getCurrentDate(), nextUser.id)
@@ -3839,8 +3909,10 @@
       );
     }
 
+    window.__appMounted = true;
     const root = window.ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
+    })();
   </script>
 </body>
 </html>
